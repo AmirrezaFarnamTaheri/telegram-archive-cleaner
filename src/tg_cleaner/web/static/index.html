@@ -107,13 +107,13 @@
   x-cloak
 >
 
-  <!-- Skip to Main Content Link for Keyboard / Screen Readers -->
+  <!-- Accessibility Skip Link -->
   <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-1.5 focus:bg-sky-600 focus:text-white focus:rounded focus:outline-none focus:ring-2 focus:ring-white text-xs font-mono">Skip to main content</a>
 
   <!-- Sticky Top Cockpit Bar -->
   <header role="banner" class="border-b border-borderSubtle bg-canvas/95 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-5 py-2.5 flex items-center justify-between min-h-[53px]">
     <div class="flex items-center space-x-2 sm:space-x-3.5 min-w-0">
-      <!-- Mobile Drawer Hamburger Toggle Button -->
+      <!-- Mobile Drawer Toggle Button -->
       <button 
         @click="sidebarOpen = !sidebarOpen" 
         class="p-2 sm:p-1.5 rounded-md bg-surface border border-borderSubtle text-slate-300 hover:text-white hover:border-slate-600 transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shrink-0"
@@ -133,7 +133,7 @@
           <h1 class="text-xs sm:text-sm font-bold tracking-tight text-white truncate">Archive Cleaner</h1>
           <span class="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.2 rounded bg-surfaceElevated border border-borderSubtle text-slate-400 shrink-0">v1.2</span>
         </div>
-        <p class="text-[10px] sm:text-[11px] text-slate-400 hidden md:block truncate">Forensic duplicate detection, link verification and cryptographic rollback</p>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 hidden md:block truncate">Forensic duplicate analysis and verified rollback</p>
       </div>
     </div>
 
@@ -236,7 +236,7 @@
       aria-hidden="true"
     ></div>
 
-    <!-- Navigation Sidebar (Drawer on mobile, split-column on desktop) -->
+    <!-- Navigation Sidebar -->
     <aside 
       x-show="sidebarOpen || !isMobile"
       :class="{
@@ -299,7 +299,7 @@
       </div>
     </aside>
 
-    <!-- Center Workspace -->
+    <!-- Center Workspace Stage -->
     <main id="main-content" role="main" class="flex-1 flex flex-col overflow-y-auto bg-canvas p-3 sm:p-5 lg:p-6 space-y-4 sm:space-y-5">
       
       <!-- Standalone Offline Sandbox Banner -->
@@ -310,7 +310,7 @@
         <div class="flex items-center space-x-2.5 min-w-0">
           <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
           <span class="truncate">
-            <strong>Standalone Sandbox:</strong> Client-side preview active. To connect live Telegram accounts and SQLite, launch <code class="bg-amber-900/40 px-1 py-0.5 rounded font-mono text-[11px] text-amber-100">TelegramArchiveCleaner.exe web</code>.
+            <strong>Standalone Sandbox:</strong> Client preview active. To connect live Telegram accounts and SQLite, launch <code class="bg-amber-900/40 px-1 py-0.5 rounded font-mono text-[11px] text-amber-100">TelegramArchiveCleaner.exe web</code>.
           </span>
         </div>
         <div class="flex items-center space-x-2 shrink-0">
@@ -322,65 +322,32 @@
           </button>
         </div>
       </div>
-      
-      <!-- Interactive Onboarding Quick-Start Guide -->
-      <div 
-        x-show="showOnboardingGuide && chats.length === 0" 
-        class="bg-surface border border-sky-900/50 rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-sm"
-      >
-        <div class="flex items-start justify-between">
-          <div>
-            <h2 class="text-sm font-bold text-white flex items-center space-x-2">
-              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
-              <span>Forensic Archive Workflow</span>
-            </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Three steps to inspect, deduplicate, and curate Telegram archives with full cryptographic backup protection</p>
-          </div>
-          <button @click="showOnboardingGuide = false" class="text-xs text-slate-500 hover:text-white font-mono">&times; Dismiss</button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
-            <div class="text-[10px] font-mono text-sky-400 font-bold uppercase">1. Ingest Archive</div>
-            <p class="text-xs font-semibold text-slate-200">Load Source Data</p>
-            <p class="text-[11px] text-slate-400">Import a Telegram Desktop <code class="text-sky-300 font-mono">result.json</code> export file, connect your MTProto session, or load the fixture dataset.</p>
-            <div class="pt-2">
-              <button @click="generateDemoData()" class="px-2 py-1 text-xs font-mono rounded bg-sky-950/60 hover:bg-sky-900 text-sky-300 border border-sky-800/60 transition active:scale-[0.98]">
-                Load Demonstration Sandbox
-              </button>
-            </div>
-          </div>
-
-          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
-            <div class="text-[10px] font-mono text-emerald-400 font-bold uppercase">2. Audit & Deduplicate</div>
-            <p class="text-xs font-semibold text-slate-200">Multi-Engine Verification</p>
-            <p class="text-[11px] text-slate-400">Runs exact SHA-256 byte payload matching, visual perceptual hashing (dHash/pHash), and dead link validation via SSRF-safe clients.</p>
-          </div>
-
-          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
-            <div class="text-[10px] font-mono text-amber-400 font-bold uppercase">3. Safe Deletion</div>
-            <p class="text-xs font-semibold text-slate-200">Pre-Deletion Backups</p>
-            <p class="text-[11px] text-slate-400">Every deletion operation writes a verified SHA-256 JSON snapshot to <code class="text-slate-300 font-mono">backups/</code> with dry-run support.</p>
-          </div>
-        </div>
-      </div>
 
       <!-- Empty State When No Chat is Selected -->
-      <div x-show="!selectedChat" class="text-center py-16 sm:py-24 text-slate-500 max-w-md mx-auto">
-        <div class="w-12 h-12 rounded-lg bg-surface border border-borderSubtle flex items-center justify-center mx-auto mb-3 text-slate-400">
-          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      <div x-show="!selectedChat" class="text-center py-16 sm:py-24 text-slate-500 max-w-lg mx-auto">
+        <div class="w-14 h-14 rounded-xl bg-surface border border-borderSubtle flex items-center justify-center mx-auto mb-4 text-sky-400 shadow-md">
+          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         </div>
-        <h3 class="text-sm font-semibold text-slate-200">Select an archive source</h3>
-        <p class="text-xs text-slate-400 mt-1 mb-4">Choose a chat from the index or click below to launch the interactive demo sandbox.</p>
-        <button 
-          @click="generateDemoData()" 
-          class="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] inline-flex items-center space-x-1.5 shadow-sm"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          <span>Launch Interactive Demo Sandbox</span>
-        </button>
+        <h2 class="text-base sm:text-lg font-bold text-slate-100">Select an archive source</h2>
+        <p class="text-xs text-slate-400 mt-1.5 mb-5 max-w-sm mx-auto">Choose an indexed chat from the left panel, import a desktop export JSON file, or launch the interactive demonstration sandbox.</p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+          <button 
+            @click="generateDemoData()" 
+            class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] inline-flex items-center justify-center space-x-2 shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            <span>Launch Interactive Demo Sandbox</span>
+          </button>
+          <button 
+            @click="showImportModal = true" 
+            class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-md bg-surface hover:bg-surfaceElevated border border-borderSubtle text-slate-200 transition active:scale-[0.98] inline-flex items-center justify-center space-x-2"
+          >
+            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            <span>Import Desktop JSON</span>
+          </button>
+        </div>
       </div>
 
       <!-- Active Chat Workspace -->
@@ -392,24 +359,24 @@
               <h2 class="text-base sm:text-lg font-bold text-white tracking-tight truncate" x-text="selectedChat?.title"></h2>
               <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-800/50 uppercase shrink-0" x-text="selectedChat?.chat_type"></span>
             </div>
-            <p class="text-[11px] font-mono text-slate-400 mt-1" x-text="`Target ID: ${selectedChat?.id} • Indexed Records: ${stats?.total_messages || 0} • Reclaimable: ${formatBytes(stats?.total_reclaimable_bytes || 0)}`"></p>
+            <p class="text-[11px] font-mono text-slate-400 mt-1" x-text="`Target ID: ${selectedChat?.id} : Indexed Records: ${stats?.total_messages || 0} : Reclaimable: ${formatBytes(stats?.total_reclaimable_bytes || 0)}`"></p>
           </div>
 
           <div class="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
             <button 
               @click="runScan()" 
               :disabled="scanning"
-              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shadow-sm"
+              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shadow-sm cursor-pointer"
             >
               <svg x-show="scanning" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
               <svg x-show="!scanning" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <span x-text="scanning ? 'Auditing Archive...' : 'Audit & Deduplicate'"></span>
+              <span x-text="scanning ? 'Auditing Archive...' : 'Audit Archive'"></span>
             </button>
 
             <button 
               @click="showDeleteModal = true" 
               :disabled="selectedCandidateIds.length === 0"
-              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-rose-600/90 hover:bg-rose-600 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none shadow-sm"
+              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-rose-600/90 hover:bg-rose-600 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none shadow-sm cursor-pointer"
             >
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               <span>Delete Staged (<span x-text="selectedCandidateIds.length"></span>)</span>
@@ -484,11 +451,11 @@
           </div>
         </div>
 
-        <!-- Navigation Tabs: Candidates, Diff Studio, Cryptographic Backups -->
+        <!-- Navigation Tabs: Candidates, Diff Studio, Cryptographic Backups, MTProto -->
         <div class="border-b border-borderSubtle flex space-x-2 sm:space-x-4 overflow-x-auto scrollbar-none">
           <button 
             @click="activeTab = 'candidates'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
             :class="activeTab === 'candidates' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
           >
             <span>Flagged Candidates</span>
@@ -497,7 +464,7 @@
 
           <button 
             @click="activeTab = 'diffs'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
             :class="activeTab === 'diffs' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
           >
             <span>Diff Studio</span>
@@ -506,11 +473,19 @@
 
           <button 
             @click="activeTab = 'backups'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
             :class="activeTab === 'backups' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
           >
             <span>Backup Ledger</span>
             <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-surfaceElevated border border-borderSubtle text-slate-300" x-text="backups.length"></span>
+          </button>
+
+          <button 
+            @click="activeTab = 'auth'" 
+            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
+            :class="activeTab === 'auth' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
+          >
+            <span>MTProto & Settings</span>
           </button>
         </div>
 
@@ -522,35 +497,35 @@
             <div class="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
               <button 
                 @click="candidateFilter = 'all'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition"
+                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
                 :class="candidateFilter === 'all' ? 'bg-sky-950 border border-sky-600 text-sky-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
               >
                 All (<span x-text="candidates.length"></span>)
               </button>
               <button 
                 @click="candidateFilter = 'exact'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition"
+                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
                 :class="candidateFilter === 'exact' ? 'bg-amber-950 border border-amber-600 text-amber-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
               >
                 Exact
               </button>
               <button 
                 @click="candidateFilter = 'diff'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition"
+                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
                 :class="candidateFilter === 'diff' ? 'bg-sky-950 border border-sky-600 text-sky-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
               >
                 Visual Diff
               </button>
               <button 
                 @click="candidateFilter = 'link'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition"
+                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
                 :class="candidateFilter === 'link' ? 'bg-rose-950 border border-rose-600 text-rose-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
               >
                 Dead Links
               </button>
               <button 
                 @click="candidateFilter = 'policy'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition"
+                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
                 :class="candidateFilter === 'policy' ? 'bg-purple-950 border border-purple-600 text-purple-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
               >
                 Policy
@@ -569,7 +544,7 @@
               <button 
                 x-show="searchQuery" 
                 @click="searchQuery = ''" 
-                class="absolute right-2 top-1.5 text-slate-500 hover:text-slate-300 text-xs"
+                class="absolute right-2 top-1.5 text-slate-500 hover:text-slate-300 text-xs cursor-pointer"
               >
                 &times;
               </button>
@@ -579,10 +554,10 @@
           <!-- Selection Controls Bar -->
           <div class="flex items-center justify-between text-xs px-1 text-slate-400">
             <div class="flex items-center space-x-2">
-              <button @click="selectAllCandidates()" class="hover:text-white underline">Select All</button>
-              <span>•</span>
-              <button @click="deselectAllCandidates()" class="hover:text-white underline">Deselect</button>
-              <span>•</span>
+              <button @click="selectAllCandidates()" class="hover:text-white underline cursor-pointer">Select All</button>
+              <span>:</span>
+              <button @click="deselectAllCandidates()" class="hover:text-white underline cursor-pointer">Deselect</button>
+              <span>:</span>
               <span class="font-mono text-slate-300" x-text="`${selectedCandidateIds.length} of ${filteredCandidates().length} staged`"></span>
             </div>
             
@@ -642,7 +617,7 @@
                   <div class="flex items-center space-x-1.5">
                     <button 
                       @click="openRawInspector(candidate)" 
-                      class="px-2 py-1 text-[10px] font-mono rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300 transition"
+                      class="px-2 py-1 text-[10px] font-mono rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300 transition cursor-pointer"
                       title="Inspect message payload JSON"
                     >
                       JSON
@@ -650,7 +625,7 @@
                     <button 
                       x-show="candidate.media_type" 
                       @click="openMediaInspect(selectedChat.id, candidate.id, candidate.text)"
-                      class="px-2 py-1 text-[10px] font-mono rounded bg-sky-950 hover:bg-sky-900 border border-sky-800/60 text-sky-300 transition"
+                      class="px-2 py-1 text-[10px] font-mono rounded bg-sky-950 hover:bg-sky-900 border border-sky-800/60 text-sky-300 transition cursor-pointer"
                     >
                       Media
                     </button>
@@ -662,7 +637,7 @@
             <!-- Empty candidates state -->
             <div x-show="filteredCandidates().length === 0" class="text-center py-12 text-slate-500 bg-surface rounded-lg border border-borderSubtle">
               <p class="font-medium text-slate-400">No candidate messages match the criteria</p>
-              <p class="text-xs text-slate-500 mt-1">Run an audit scan or clear search query.</p>
+              <p class="text-xs text-slate-500 mt-1">Run an audit scan or clear the active search filter.</p>
             </div>
           </div>
 
@@ -671,7 +646,7 @@
             <button 
               @click="prevPage()" 
               :disabled="page === 1" 
-              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
+              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 cursor-pointer"
             >
               Previous
             </button>
@@ -679,7 +654,7 @@
             <button 
               @click="nextPage()" 
               :disabled="page === totalPages()" 
-              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
+              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 cursor-pointer"
             >
               Next
             </button>
@@ -689,7 +664,7 @@
         <!-- TAB 2: VISUAL DIFF STUDIO -->
         <div x-show="activeTab === 'diffs'" class="space-y-4">
           <div class="bg-surface p-4 rounded-lg border border-borderSubtle">
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Visual Variation & Caption Diffing Deck</h3>
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Visual Variation and Caption Diffing</h3>
             <p class="text-xs text-slate-400 mt-0.5">Compares messages sharing identical media payloads with altered announcement captions or links.</p>
           </div>
 
@@ -700,246 +675,273 @@
                 <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300" x-text="`${group.messages.length} media instances`"></span>
               </div>
 
-              <div class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <template x-for="msg in group.messages" :key="msg.id">
+              <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <template x-for="(msg, idx) in group.messages" :key="msg.id">
                   <div 
-                    class="p-3.5 rounded-md border flex flex-col justify-between space-y-2.5 transition"
-                    :class="group.suggested_keep_id === msg.id ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-canvas border-borderSubtle'"
+                    class="p-3.5 rounded-lg border flex flex-col justify-between space-y-3"
+                    :class="msg.id === group.suggested_keep_id ? 'bg-emerald-950/20 border-emerald-700/50' : 'bg-canvas border-borderSubtle'"
                   >
-                    <div class="space-y-1.5">
+                    <div class="space-y-2">
                       <div class="flex items-center justify-between">
-                        <span class="text-xs font-mono font-bold" :class="group.suggested_keep_id === msg.id ? 'text-emerald-300' : 'text-slate-300'" x-text="`#${msg.id}`"></span>
+                        <span class="font-mono text-xs font-bold text-slate-200" x-text="`#${msg.id}`"></span>
                         <span 
                           class="text-[9px] font-mono px-1.5 py-0.2 rounded uppercase"
-                          :class="group.suggested_keep_id === msg.id ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'"
-                          x-text="group.suggested_keep_id === msg.id ? 'Reference (Keep)' : 'Superseded (Staged)'"
+                          :class="msg.id === group.suggested_keep_id ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50' : 'bg-surface text-slate-400 border border-borderSubtle'"
+                          x-text="msg.id === group.suggested_keep_id ? 'Primary Candidate' : 'Variant'"
                         ></span>
                       </div>
-                      <div class="text-[10px] font-mono text-slate-500" x-text="formatDate(msg.date)"></div>
-                      
-                      <!-- Caption Diff Rendering -->
-                      <div class="text-xs text-slate-300 pt-1 leading-relaxed" x-html="renderCaptionDiff(group.messages.find(m => m.id === group.suggested_keep_id)?.text, msg.text)"></div>
+                      <p class="text-xs text-slate-300 break-words font-sans" x-text="msg.text || '[No caption text]'"></p>
                     </div>
 
-                    <div class="pt-2 border-t border-borderSubtle flex items-center justify-between">
-                      <button 
-                        @click="group.suggested_keep_id = msg.id" 
-                        class="text-[10px] font-mono px-2 py-1 rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300"
-                      >
-                        Designate As Retained
-                      </button>
-                      <button 
-                        @click="openMediaInspect(selectedChat.id, msg.id, msg.text)" 
-                        class="text-[10px] font-mono text-sky-400 hover:text-sky-300 underline"
-                      >
-                        Inspect Payload
-                      </button>
+                    <div class="flex items-center justify-between pt-2 border-t border-borderSubtle text-[11px] font-mono text-slate-400">
+                      <span x-text="formatDate(msg.date)"></span>
+                      <span x-text="formatBytes(msg.file_size || 0)"></span>
                     </div>
                   </div>
                 </template>
+              </div>
+
+              <!-- Retention Preset Selector Bar -->
+              <div class="px-4 py-2.5 bg-surfaceElevated/50 border-t border-borderSubtle flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span class="text-slate-400">Retention policy for cluster:</span>
+                <div class="flex items-center space-x-1.5">
+                  <button 
+                    @click="setGroupPreset(group.group_id, 'KEEP_NEWEST')" 
+                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
+                  >
+                    Keep Newest
+                  </button>
+                  <button 
+                    @click="setGroupPreset(group.group_id, 'KEEP_OLDEST')" 
+                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
+                  >
+                    Keep Oldest
+                  </button>
+                  <button 
+                    @click="setGroupPreset(group.group_id, 'KEEP_LONGEST_CAPTION')" 
+                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
+                  >
+                    Keep Longest Caption
+                  </button>
+                </div>
               </div>
             </div>
           </template>
 
           <div x-show="diffGroups.length === 0" class="text-center py-12 text-slate-500 bg-surface rounded-lg border border-borderSubtle">
-            <p class="font-medium text-slate-400">No media caption variations found</p>
-            <p class="text-xs text-slate-500 mt-1">Audit complete. All media instances have identical textual captions.</p>
+            <p class="font-medium text-slate-400">No media caption variations detected</p>
+            <p class="text-xs text-slate-500 mt-1">Audit the archive or import new messages to populate the comparison deck.</p>
           </div>
         </div>
 
         <!-- TAB 3: CRYPTOGRAPHIC BACKUP LEDGER -->
         <div x-show="activeTab === 'backups'" class="space-y-4">
-          <div class="bg-surface p-4 rounded-lg border border-borderSubtle flex items-center justify-between">
+          <div class="bg-surface p-4 rounded-lg border border-borderSubtle flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Verified Pre-Deletion Snapshots</h3>
-              <p class="text-xs text-slate-400 mt-0.5">Every deletion writes a SHA-256 verified JSON archive to disk before Telegram API calls are dispatched.</p>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Cryptographic Backup Ledger</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Every deletion writes a verified SHA-256 JSON snapshot prior to modifying data.</p>
             </div>
-            <button @click="loadBackups()" class="px-2.5 py-1 text-xs font-mono rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300">
+            <button 
+              @click="loadBackups()" 
+              class="px-2.5 py-1 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white transition cursor-pointer self-start sm:self-auto"
+            >
               Refresh Ledger
             </button>
           </div>
 
-          <div class="bg-surface rounded-lg border border-borderSubtle overflow-hidden">
-            <div class="overflow-x-auto min-w-[700px]">
-              <table class="w-full text-left text-xs">
-                <thead class="bg-surfaceElevated border-b border-borderSubtle text-slate-400 font-mono text-[11px]">
-                  <tr>
-                    <th class="p-3">Filename</th>
-                    <th class="p-3">Created</th>
-                    <th class="p-3 text-right">Items</th>
-                    <th class="p-3 text-right">Size</th>
-                    <th class="p-3">SHA-256 Checksum</th>
-                    <th class="p-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-borderSubtle font-mono text-[11px]">
-                  <template x-for="b in backups" :key="b.filename">
-                    <tr class="hover:bg-canvas/50 transition">
-                      <td class="p-3 font-semibold text-slate-200" x-text="b.filename"></td>
-                      <td class="p-3 text-slate-400" x-text="formatDate(b.created_at)"></td>
-                      <td class="p-3 text-right tabular-nums text-slate-300" x-text="b.message_count"></td>
-                      <td class="p-3 text-right tabular-nums text-slate-300" x-text="formatBytes(b.size_bytes)"></td>
-                      <td class="p-3 text-slate-400">
-                        <div class="flex items-center space-x-1.5">
-                          <span class="truncate max-w-[140px]" x-text="b.sha256"></span>
-                          <button @click="copyToClipboard(b.sha256, 'SHA-256')" class="p-1 rounded text-slate-400 hover:text-white" title="Copy digest">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                          </button>
-                        </div>
-                      </td>
-                      <td class="p-3 text-right">
+          <div class="overflow-x-auto bg-surface rounded-lg border border-borderSubtle">
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-surfaceElevated text-[11px] font-mono text-slate-400 border-b border-borderSubtle uppercase">
+                <tr>
+                  <th class="py-2.5 px-3 font-semibold">Archive File</th>
+                  <th class="py-2.5 px-3 font-semibold">Created</th>
+                  <th class="py-2.5 px-3 font-semibold">Messages</th>
+                  <th class="py-2.5 px-3 font-semibold">SHA-256 Checksum</th>
+                  <th class="py-2.5 px-3 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-borderSubtle">
+                <template x-for="b in backups" :key="b.filename">
+                  <tr class="hover:bg-surfaceElevated/50 transition">
+                    <td class="py-2.5 px-3 font-mono font-medium text-slate-200 truncate max-w-[200px]" x-text="b.filename"></td>
+                    <td class="py-2.5 px-3 text-slate-400" x-text="formatDate(b.created_at)"></td>
+                    <td class="py-2.5 px-3 font-mono" x-text="b.message_count"></td>
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center space-x-1.5 font-mono text-[11px] text-slate-400">
+                        <span class="truncate max-w-[120px]" x-text="b.sha256"></span>
+                        <button 
+                          @click="copyToClipboard(b.sha256, 'SHA-256')" 
+                          class="p-0.5 text-slate-500 hover:text-slate-300 cursor-pointer"
+                          title="Copy Full Checksum"
+                        >
+                          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-3 text-right">
+                      <div class="flex items-center justify-end space-x-1.5">
+                        <button 
+                          @click="verifyBackupChecksum(b)" 
+                          class="px-2 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800/60 text-emerald-300 font-mono text-[10px] transition cursor-pointer"
+                        >
+                          Verify
+                        </button>
                         <button 
                           @click="openCloudExport(b)" 
-                          class="px-2 py-1 rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-800 text-sky-300 text-[10px]"
+                          class="px-2 py-0.5 rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-800/60 text-sky-300 font-mono text-[10px] transition cursor-pointer"
                         >
-                          Offsite Export
+                          Offsite
                         </button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-
-            <div x-show="backups.length === 0" class="text-center py-10 text-slate-500 font-mono text-xs">
-              No backups recorded. Snapshots will appear here automatically upon running staged deletions.
-            </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="backups.length === 0">
+                  <td colspan="5" class="py-8 text-center text-slate-500">
+                    No pre-deletion backups recorded yet. Backups are created automatically before any deletion.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
+        <!-- TAB 4: MTPROTO & SETTINGS CONSOLE -->
+        <div x-show="activeTab === 'auth'" class="space-y-4">
+          <div class="bg-surface p-4 sm:p-5 rounded-lg border border-borderSubtle space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Telegram MTProto Connection & Network Proxy</h3>
+              <p class="text-xs text-slate-400 mt-1">Configure your API credentials from my.telegram.org and setup an optional network proxy.</p>
+            </div>
+
+            <!-- Credentials Section -->
+            <div class="space-y-3 pt-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-400 mb-1">Telegram API ID</label>
+                  <input 
+                    type="text" 
+                    x-model="authApiId" 
+                    placeholder="e.g. 12345678" 
+                    class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                </div>
+                <div>
+                  <label class="block text-[11px] font-mono text-slate-400 mb-1">Telegram API Hash</label>
+                  <input 
+                    type="password" 
+                    x-model="authApiHash" 
+                    placeholder="32-character hexadecimal hash" 
+                    class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                </div>
+              </div>
+
+              <!-- Proxy Settings -->
+              <div class="pt-2 border-t border-borderSubtle space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-300">Network Proxy (Optional)</span>
+                  <span class="text-[10px] font-mono text-slate-500">SOCKS5, HTTP, or MTProxy</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Proxy Type</label>
+                    <select 
+                      x-model="authProxyType" 
+                      class="w-full bg-canvas border border-borderSubtle rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value="">Direct (No Proxy)</option>
+                      <option value="socks5">SOCKS5</option>
+                      <option value="http">HTTP</option>
+                      <option value="mtproxy">MTProxy</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Host / IP</label>
+                    <input 
+                      type="text" 
+                      x-model="authProxyHost" 
+                      placeholder="127.0.0.1" 
+                      class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Port</label>
+                    <input 
+                      type="text" 
+                      x-model="authProxyPort" 
+                      placeholder="1080" 
+                      class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-3 flex justify-end">
+                <button 
+                  @click="saveCredentials()" 
+                  :disabled="authLoading"
+                  class="px-4 py-2 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                >
+                  Save Configuration
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
 
-  <!-- COMMAND PALETTE MODAL (Ctrl+K) -->
-  <div 
-    x-show="showCommandPalette" 
-    class="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
-  >
-    <div 
-      @click.outside="showCommandPalette = false"
-      class="w-full max-w-lg bg-surface border border-borderStrong rounded-lg shadow-2xl overflow-hidden font-mono"
-    >
-      <div class="p-3 border-b border-borderSubtle flex items-center space-x-2">
-        <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input 
-          id="commandPaletteInput"
-          type="text" 
-          x-model="commandQuery" 
-          placeholder="Type an operation name..." 
-          class="w-full bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
-        >
-        <kbd class="px-1.5 py-0.5 text-[10px] rounded bg-surfaceElevated border border-borderSubtle text-slate-400">Esc</kbd>
-      </div>
-
-      <div class="max-h-80 overflow-y-auto divide-y divide-borderSubtle p-1">
-        <template x-for="cmd in filteredCommands()" :key="cmd.id">
-          <button 
-            @click="executeCommand(cmd)" 
-            class="w-full text-left px-3 py-2 text-xs rounded hover:bg-sky-950/50 hover:text-sky-300 text-slate-300 flex items-center justify-between transition group"
-          >
-            <span x-text="cmd.title"></span>
-            <span class="text-[10px] text-slate-500 uppercase px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle group-hover:border-sky-800" x-text="cmd.category"></span>
-          </button>
-        </template>
-      </div>
-    </div>
-  </div>
-
-  <!-- RAW MESSAGE FORENSIC INSPECTOR MODAL -->
-  <div 
-    x-show="showRawInspectorModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
-  >
-    <div 
-      @click.outside="showRawInspectorModal = false"
-      class="w-full max-w-xl bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 max-h-[85vh] flex flex-col"
-    >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
-        <h3 class="text-sm font-bold text-white font-mono" x-text="`Forensic Record: Message #${inspectedMessage?.id}`"></h3>
-        <button @click="showRawInspectorModal = false" class="text-slate-400 hover:text-white">&times;</button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto bg-canvas p-3 rounded border border-borderSubtle font-mono text-[11px] text-slate-300 leading-relaxed whitespace-pre-wrap">
-        <pre x-text="JSON.stringify(inspectedMessage, null, 2)"></pre>
-      </div>
-
-      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-borderSubtle">
-        <button 
-          @click="copyToClipboard(JSON.stringify(inspectedMessage, null, 2), 'JSON record')" 
-          class="px-3 py-1.5 text-xs font-mono rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300"
-        >
-          Copy JSON
-        </button>
-        <button 
-          @click="showRawInspectorModal = false" 
-          class="px-3 py-1.5 text-xs font-mono rounded bg-sky-600 hover:bg-sky-500 text-white"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SAFE DELETION EXECUTION MODAL -->
+  <!-- MODAL: SAFE DELETION EXECUTION -->
   <div 
     x-show="showDeleteModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showDeleteModal = false"
-      class="w-full max-w-md bg-surface border border-rose-900/50 rounded-lg shadow-2xl p-5 space-y-4"
+      @click.outside="showDeleteModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
     >
-      <div class="flex items-center space-x-2 text-rose-400">
-        <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <h3 class="text-sm font-bold text-white">Safe Deletion Execution</h3>
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span>Execute Deletion Operation</span>
+        </h3>
+        <button @click="showDeleteModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
       </div>
 
-      <div class="p-3 bg-canvas rounded border border-borderSubtle space-y-2 text-xs">
-        <div class="flex justify-between text-slate-300 font-mono">
-          <span>Staged messages:</span>
-          <span class="font-bold text-white" x-text="selectedCandidateIds.length"></span>
+      <div class="space-y-3 text-xs text-slate-300">
+        <p>You have staged <strong class="text-rose-400 font-mono" x-text="selectedCandidateIds.length"></strong> messages for deletion.</p>
+        <p>Estimated reclaimable storage: <strong class="text-emerald-400 font-mono" x-text="formatBytes(selectedCandidatesBytes())"></strong>.</p>
+        
+        <div class="p-3 bg-canvas border border-borderSubtle rounded-md space-y-2">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" x-model="dryRunMode" class="rounded bg-surface border-borderStrong text-sky-600 focus:ring-sky-500 h-4 w-4">
+            <span class="font-medium text-slate-200">Dry-Run Simulation Mode</span>
+          </label>
+          <p class="text-[11px] text-slate-400 pl-6">When active, the pipeline validates actions and writes backups without deleting records from Telegram servers.</p>
         </div>
-        <div class="flex justify-between text-slate-300 font-mono">
-          <span>Reclaimable storage:</span>
-          <span class="font-bold text-emerald-400" x-text="formatBytes(selectedCandidatesBytes())"></span>
-        </div>
-        <div class="flex justify-between text-slate-300 font-mono">
-          <span>Snapshot location:</span>
-          <span class="text-slate-400">backups/*.json</span>
-        </div>
-      </div>
 
-      <!-- Dry Run Switcher -->
-      <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
-        <input type="checkbox" x-model="dryRunMode" class="rounded bg-canvas border-borderStrong text-sky-600 focus:ring-sky-500 h-4 w-4">
-        <span>Dry-run simulation mode (Zero records removed from Telegram)</span>
-      </label>
-
-      <!-- Deletion Safety Confirmation -->
-      <div x-show="!dryRunMode" class="space-y-2">
-        <label class="flex items-start space-x-2 text-xs text-rose-300 cursor-pointer">
-          <input type="checkbox" x-model="confirmDeleteAcknowledge" class="mt-0.5 rounded bg-canvas border-rose-800 text-rose-600 focus:ring-rose-500 h-4 w-4 shrink-0">
-          <span>I understand that a verified JSON snapshot will be written to disk before Telegram API deletion calls are made.</span>
-        </label>
+        <div x-show="!dryRunMode" class="p-3 bg-rose-950/20 border border-rose-800/40 rounded-md space-y-2">
+          <label class="flex items-start space-x-2 cursor-pointer">
+            <input type="checkbox" x-model="confirmDeleteAcknowledge" class="mt-0.5 rounded bg-surface border-borderStrong text-rose-600 focus:ring-rose-500 h-4 w-4">
+            <span class="text-[11px] text-rose-200">I confirm that a verified SHA-256 backup will be recorded to disk before these messages are removed.</span>
+          </label>
+        </div>
       </div>
 
       <div class="flex items-center justify-end space-x-2 pt-2 border-t border-borderSubtle">
-        <button @click="showDeleteModal = false" class="px-3 py-1.5 text-xs rounded bg-surfaceElevated hover:bg-slate-800 text-slate-300 border border-borderSubtle">
+        <button 
+          @click="showDeleteModal = false" 
+          class="px-3 py-1.5 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer"
+        >
           Cancel
         </button>
         <button 
           @click="executeBatchDelete()" 
           :disabled="deleting || (!dryRunMode && !confirmDeleteAcknowledge)"
-          class="px-3.5 py-1.5 text-xs font-semibold rounded text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
-          :class="dryRunMode ? 'bg-sky-600 hover:bg-sky-500' : 'bg-rose-600 hover:bg-rose-500'"
+          class="px-4 py-1.5 text-xs font-semibold rounded bg-rose-600 hover:bg-rose-500 text-white transition active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           <span x-text="deleting ? 'Processing...' : (dryRunMode ? 'Run Simulation' : 'Execute Deletion')"></span>
         </button>
@@ -947,366 +949,211 @@
     </div>
   </div>
 
-  <!-- MTPROTO AUTHENTICATION MODAL -->
+  <!-- MODAL: RAW JSON INSPECTOR -->
   <div 
-    x-show="showAuthModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
+    x-show="showRawInspectorModal" 
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showAuthModal = false"
-      class="w-full max-w-md bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 font-mono text-xs"
+      @click.outside="showRawInspectorModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-2xl w-full p-5 space-y-3 shadow-2xl max-h-[85vh] flex flex-col"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
-        <h3 class="text-sm font-bold text-white">MTProto Authentication</h3>
-        <button @click="showAuthModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
+        <h3 class="text-xs font-bold text-white font-mono" x-text="`Message #${inspectedMessage?.id} Payload Inspector`"></h3>
+        <button @click="showRawInspectorModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
       </div>
-
-      <!-- Step 1: Credentials, Phone & Proxy -->
-      <div x-show="authStep === 'phone'" class="space-y-3.5">
-        <!-- API Credentials Block -->
-        <div class="space-y-2 p-3 rounded bg-canvas/60 border border-borderSubtle">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-slate-300">Telegram API Credentials</span>
-            <a 
-              href="https://my.telegram.org" 
-              target="_blank" 
-              class="text-[10px] text-sky-400 hover:text-sky-300 underline"
-            >my.telegram.org</a>
-          </div>
-          <p class="text-[10px] text-slate-400 leading-relaxed">
-            Obtain free API ID and API Hash from my.telegram.org under API development tools.
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">API ID</label>
-              <input 
-                type="number" 
-                x-model="authApiId" 
-                placeholder="e.g. 12345678" 
-                class="w-full bg-surface border border-borderSubtle rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-            </div>
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">API Hash</label>
-              <input 
-                type="text" 
-                x-model="authApiHash" 
-                placeholder="32-char hex string" 
-                class="w-full bg-surface border border-borderSubtle rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-            </div>
-          </div>
-        </div>
-
-        <!-- Phone Number -->
-        <div class="space-y-1">
-          <label class="block text-[10px] text-slate-400">Telegram Phone Number</label>
-          <input 
-            type="tel" 
-            x-model="authPhone" 
-            placeholder="+989123456789" 
-            class="w-full bg-canvas border border-borderSubtle rounded px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
-          >
-          <span class="text-[10px] text-slate-500">Include country code (e.g. +98 for Iran, +1 for US).</span>
-        </div>
-
-        <!-- Proxy Toggle Section -->
-        <div class="pt-1">
-          <button 
-            type="button" 
-            @click="showProxySection = !showProxySection"
-            class="text-[11px] text-slate-400 hover:text-slate-200 flex items-center space-x-1 cursor-pointer"
-          >
-            <span x-text="showProxySection ? '[-] Hide Network Proxy Settings' : '[+] Configure Network Proxy (SOCKS5 / HTTP / MTProxy)'"></span>
-          </button>
-          
-          <div x-show="showProxySection" class="mt-2 p-3 rounded bg-canvas/40 border border-borderSubtle space-y-2 text-[11px]">
-            <p class="text-[10px] text-slate-400">
-              Recommended for networks where direct MTProto connection is blocked.
-            </p>
-            <div class="grid grid-cols-3 gap-2">
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">Type</label>
-                <select 
-                  x-model="authProxyType"
-                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
-                >
-                  <option value="">None</option>
-                  <option value="socks5">SOCKS5</option>
-                  <option value="http">HTTP</option>
-                  <option value="mtproxy">MTProxy</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">Host</label>
-                <input 
-                  type="text" 
-                  x-model="authProxyHost" 
-                  placeholder="127.0.0.1"
-                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
-                >
-              </div>
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">Port</label>
-                <input 
-                  type="number" 
-                  x-model="authProxyPort" 
-                  placeholder="10808"
-                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
-                >
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2" x-show="authProxyType === 'socks5' || authProxyType === 'http'">
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">Username (Optional)</label>
-                <input 
-                  type="text" 
-                  x-model="authProxyUser" 
-                  placeholder="user"
-                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
-                >
-              </div>
-              <div>
-                <label class="block text-[10px] text-slate-400 mb-1">Password (Optional)</label>
-                <input 
-                  type="password" 
-                  x-model="authProxyPass" 
-                  placeholder="pass"
-                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
-                >
-              </div>
-            </div>
-            <div x-show="authProxyType === 'mtproxy'">
-              <label class="block text-[10px] text-slate-400 mb-1">MTProxy Secret</label>
-              <input 
-                type="text" 
-                x-model="authProxySecret" 
-                placeholder="secret hex string"
-                class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
-              >
-            </div>
-          </div>
-        </div>
-
-        <button 
-          @click="sendAuthCode()" 
-          :disabled="authLoading || !authPhone"
-          class="w-full py-2.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40 transition-colors cursor-pointer"
-        >
-          <span x-text="authLoading ? 'Connecting to MTProto...' : 'Request Verification Code'"></span>
-        </button>
+      <div class="flex-1 overflow-y-auto bg-canvas p-3 rounded border border-borderSubtle">
+        <pre class="text-[11px] font-mono text-sky-300 whitespace-pre-wrap" x-text="JSON.stringify(inspectedMessage, null, 2)"></pre>
       </div>
-
-      <!-- Step 2: Code -->
-      <div x-show="authStep === 'code'" class="space-y-3">
-        <p class="text-slate-400 text-[11px]">Enter the 5-digit verification code sent via your Telegram app.</p>
-        <input 
-          type="text" 
-          x-model="authCode" 
-          placeholder="12345" 
-          class="w-full bg-canvas border border-borderSubtle rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-sky-500 text-center tracking-widest text-lg"
-        >
+      <div class="flex justify-end pt-2 border-t border-borderSubtle">
         <button 
-          @click="completeSignIn()" 
-          :disabled="authLoading || !authCode"
-          class="w-full py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40"
+          @click="copyToClipboard(JSON.stringify(inspectedMessage, null, 2), 'Message JSON')" 
+          class="px-3 py-1 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer"
         >
-          <span x-text="authLoading ? 'Verifying...' : 'Authorize Client'"></span>
-        </button>
-      </div>
-
-      <!-- Step 3: 2FA Password -->
-      <div x-show="authStep === '2fa'" class="space-y-3">
-        <p class="text-slate-400 text-[11px]">Two-step verification cloud password required.</p>
-        <input 
-          type="password" 
-          x-model="authPassword" 
-          placeholder="Cloud password" 
-          class="w-full bg-canvas border border-borderSubtle rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-        >
-        <button 
-          @click="check2faPassword()" 
-          :disabled="authLoading || !authPassword"
-          class="w-full py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40"
-        >
-          <span x-text="authLoading ? 'Verifying...' : 'Verify Cloud Password'"></span>
+          Copy JSON
         </button>
       </div>
     </div>
   </div>
 
-  <!-- IMPORT MODAL -->
+  <!-- MODAL: MEDIA PREVIEW -->
+  <div 
+    x-show="showMediaModal" 
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs" 
+    x-cloak
+  >
+    <div 
+      @click.outside="showMediaModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-lg w-full p-5 space-y-3 shadow-2xl"
+    >
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
+        <h3 class="text-xs font-bold text-white truncate max-w-xs" x-text="inspectMediaTitle"></h3>
+        <button @click="showMediaModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
+      </div>
+      <div class="bg-canvas rounded border border-borderSubtle flex items-center justify-center min-h-[220px] p-2">
+        <img :src="inspectMediaUrl" alt="Media payload preview" class="max-h-[360px] max-w-full rounded object-contain" onerror="this.src=''; this.alt='Preview unavailable in current mode';">
+      </div>
+      <div class="text-right">
+        <button @click="showMediaModal = false" class="px-3 py-1 text-xs rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IMPORT DESKTOP EXPORT -->
   <div 
     x-show="showImportModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showImportModal = false"
-      class="w-full max-w-md bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 text-xs"
+      @click.outside="showImportModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
-        <h3 class="text-sm font-bold text-white">Import Telegram Desktop Export</h3>
-        <button @click="showImportModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
+        <h3 class="text-sm font-bold text-white">Import Telegram Desktop JSON</h3>
+        <button @click="showImportModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
       </div>
-
-      <p class="text-slate-400">Select the <code class="font-mono text-sky-300">result.json</code> file generated by Telegram Desktop (Settings &gt; Advanced &gt; Export Telegram data).</p>
-
-      <div class="border-2 border-dashed border-borderStrong hover:border-sky-500/60 rounded-lg p-6 text-center bg-canvas/40 transition">
-        <input type="file" accept=".json" @change="handleFileUpload($event)" class="hidden" id="jsonFileInput">
-        <label for="jsonFileInput" class="cursor-pointer space-y-2 block">
-          <svg class="w-8 h-8 mx-auto text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <p class="text-slate-300 font-medium">Click to select result.json file</p>
-          <p class="text-[11px] text-slate-500 font-mono">Supports standard Telegram Desktop JSON archives</p>
-        </label>
+      <div class="space-y-3 text-xs text-slate-300">
+        <p>Select your exported <code class="text-sky-300 font-mono">result.json</code> file generated by Telegram Desktop (Settings &gt; Advanced &gt; Export Telegram data).</p>
+        <div class="border-2 border-dashed border-borderStrong hover:border-sky-500 rounded-lg p-6 text-center cursor-pointer transition">
+          <input type="file" accept=".json" @change="handleFileUpload($event)" class="w-full text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- OFFSITE CLOUD EXPORT MODAL -->
+  <!-- MODAL: CLOUD OFFSITE EXPORT -->
   <div 
     x-show="showCloudExportModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showCloudExportModal = false"
-      class="w-full max-w-md bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 text-xs font-mono"
+      @click.outside="showCloudExportModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
-        <h3 class="text-sm font-bold text-white">Offsite Backup Export</h3>
-        <button @click="showCloudExportModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
+        <h3 class="text-sm font-bold text-white">Export Backup Offsite</h3>
+        <button @click="showCloudExportModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
       </div>
 
-      <p class="text-slate-400 text-[11px]" x-text="`Exporting snapshot: ${exportTargetBackup?.filename}`"></p>
-
-      <div class="space-y-3">
+      <div class="space-y-3 text-xs text-slate-300">
         <div>
-          <label class="block text-slate-400 mb-1 text-[11px]">Storage Provider</label>
-          <select x-model="cloudProvider" class="w-full bg-canvas border border-borderSubtle rounded p-2 text-white">
-            <option value="github">GitHub Private Repository</option>
-            <option value="google_drive">Google Drive</option>
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">Destination Provider</label>
+          <select x-model="cloudProvider" class="w-full bg-canvas border border-borderSubtle rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="github">GitHub Repository Storage</option>
+            <option value="google_drive">Google Drive Resumable Storage</option>
           </select>
         </div>
 
-        <div>
-          <label class="block text-slate-400 mb-1 text-[11px]">Access Token / Secret</label>
-          <input type="password" x-model="cloudToken" placeholder="Personal Access Token" class="w-full bg-canvas border border-borderSubtle rounded p-2 text-white">
-        </div>
-
         <div x-show="cloudProvider === 'github'">
-          <label class="block text-slate-400 mb-1 text-[11px]">Target Repository (owner/repo)</label>
-          <input type="text" x-model="cloudRepo" placeholder="username/telegram-backups" class="w-full bg-canvas border border-borderSubtle rounded p-2 text-white">
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">Target Repository (owner/repo)</label>
+          <input type="text" x-model="cloudRepo" placeholder="username/telegram-backups" class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500">
         </div>
 
-        <div x-show="cloudProvider === 'google_drive'">
-          <label class="block text-slate-400 mb-1 text-[11px]">Folder ID (Optional)</label>
-          <input type="text" x-model="cloudFolderId" placeholder="root" class="w-full bg-canvas border border-borderSubtle rounded p-2 text-white">
+        <div>
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">Access Token</label>
+          <input type="password" x-model="cloudToken" placeholder="GitHub Personal Access Token or Google OAuth Token" class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500">
         </div>
+      </div>
 
+      <div class="flex justify-end space-x-2 pt-2 border-t border-borderSubtle">
+        <button @click="showCloudExportModal = false" class="px-3 py-1.5 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer">Cancel</button>
         <button 
           @click="executeCloudExport()" 
-          :disabled="cloudExporting || !cloudToken"
-          class="w-full py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40"
+          :disabled="cloudExporting"
+          class="px-4 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
-          <span x-text="cloudExporting ? 'Exporting...' : 'Dispatch Offsite Export'"></span>
+          <span x-text="cloudExporting ? 'Exporting Archive...' : 'Start Offsite Export'"></span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- MEDIA INSPECT MODAL -->
+  <!-- MODAL: COMMAND PALETTE (Ctrl+K) -->
   <div 
-    x-show="showMediaModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs"
-    x-transition
+    x-show="showCommandPalette" 
+    class="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showMediaModal = false"
-      class="w-full max-w-lg bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-3"
+      @click.outside="showCommandPalette = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-2 p-3"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
-        <h3 class="text-sm font-bold text-white font-mono" x-text="inspectMediaTitle"></h3>
-        <button @click="showMediaModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      <div class="relative">
+        <input 
+          id="commandPaletteInput"
+          type="text" 
+          x-model="commandQuery" 
+          placeholder="Type a command or filter name..." 
+          class="w-full bg-canvas border border-borderSubtle rounded-md px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
+        >
       </div>
 
-      <div class="bg-canvas rounded-lg p-3 flex items-center justify-center min-h-[220px] border border-borderSubtle">
-        <img :src="inspectMediaUrl" alt="Media Payload Preview" class="max-h-[60vh] max-w-full rounded object-contain" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'1\'><rect x=\'3\' y=\'3\' width=\'18\' height=\'18\' rx=\'2\'/><circle cx=\'8.5\' cy=\'8.5\' r=\'1.5\'/><path d=\'M21 15l-5-5L5 21\'/></svg>'">
-      </div>
-
-      <div class="flex justify-end">
-        <button @click="showMediaModal = false" class="px-3 py-1.5 text-xs font-mono rounded bg-surfaceElevated hover:bg-slate-800 text-slate-300 border border-borderSubtle">
-          Close Preview
-        </button>
+      <div class="max-h-64 overflow-y-auto space-y-1 pr-1">
+        <template x-for="cmd in filteredCommands()" :key="cmd.id">
+          <div 
+            @click="executeCommand(cmd)" 
+            class="px-3 py-2 rounded-md hover:bg-surfaceElevated cursor-pointer transition flex items-center justify-between text-xs"
+          >
+            <span class="text-slate-200" x-text="cmd.title"></span>
+            <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-canvas border border-borderSubtle text-slate-400" x-text="cmd.category"></span>
+          </div>
+        </template>
       </div>
     </div>
   </div>
 
-  <!-- KEYBOARD SHORTCUTS MODAL -->
+  <!-- MODAL: KEYBOARD SHORTCUTS (?) -->
   <div 
     x-show="showShortcutsModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs"
-    x-transition
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
+    x-cloak
   >
     <div 
-      @click.outside="showShortcutsModal = false"
-      class="w-full max-w-sm bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 font-mono text-xs"
+      @click.outside="showShortcutsModal = false" 
+      class="bg-surface border border-borderStrong rounded-xl max-w-sm w-full p-5 space-y-4 shadow-2xl"
     >
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <h3 class="text-sm font-bold text-white">Keyboard Navigation</h3>
-        <button @click="showShortcutsModal = false" class="text-slate-400 hover:text-white">&times;</button>
+        <button @click="showShortcutsModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
       </div>
-
-      <div class="space-y-2 text-slate-300">
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
+      <div class="space-y-2 text-xs text-slate-300 font-mono">
+        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
           <span>Command Palette</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">Ctrl+K</kbd>
+          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">Ctrl+K</kbd>
         </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
-          <span>Flagged Candidates</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">1</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
-          <span>Diff Studio</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">2</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
-          <span>Backup Ledger</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">3</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
+        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
           <span>Focus Search</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">/</kbd>
+          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">/</kbd>
         </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle/50">
-          <span>Dismiss Modals</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">Esc</kbd>
+        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
+          <span>Shortcuts Dialog</span>
+          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">?</kbd>
         </div>
         <div class="flex justify-between items-center py-1">
-          <span>Help Guide</span>
-          <kbd class="px-1.5 py-0.5 rounded bg-surfaceElevated border border-borderSubtle text-[11px]">?</kbd>
+          <span>Dismiss Dialogs</span>
+          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">ESC</kbd>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- FLOATING TOAST NOTIFICATION STACK -->
-  <div class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 max-w-sm w-full pointer-events-none">
-    <template x-for="toast in toasts" :key="toast.id">
+  <!-- TOAST NOTIFICATIONS STACK -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full pointer-events-none">
+    <template x-for="t in toasts" :key="t.id">
       <div 
-        class="pointer-events-auto p-3 rounded-lg border shadow-xl flex items-start justify-between space-x-2 text-xs transition-all font-mono"
+        class="pointer-events-auto p-3 rounded-lg border shadow-xl flex items-start justify-between space-x-2 text-xs transition-all"
         :class="{
-          'bg-slate-900 border-sky-600/70 text-sky-200': toast.type === 'info',
-          'bg-slate-900 border-emerald-600/70 text-emerald-200': toast.type === 'success',
-          'bg-slate-900 border-amber-600/70 text-amber-200': toast.type === 'warning',
-          'bg-slate-900 border-rose-600/70 text-rose-200': toast.type === 'error'
+          'bg-slate-900 border-sky-600 text-sky-200': t.type === 'info',
+          'bg-slate-900 border-emerald-600 text-emerald-200': t.type === 'success',
+          'bg-slate-900 border-amber-600 text-amber-200': t.type === 'warning',
+          'bg-slate-900 border-rose-600 text-rose-200': t.type === 'error'
         }"
       >
-        <span class="leading-relaxed" x-text="toast.message"></span>
-        <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-white text-sm leading-none">&times;</button>
+        <span class="flex-1 break-words" x-text="t.message"></span>
+        <button @click="removeToast(t.id)" class="text-slate-400 hover:text-white cursor-pointer">&times;</button>
       </div>
     </template>
   </div>
