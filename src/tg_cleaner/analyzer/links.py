@@ -43,7 +43,10 @@ class LinkHealthChecker:
             headers={"User-Agent": "TelegramArchiveCleaner/1.0 link-audit"},
         ) as http_client:
             results = await asyncio.gather(
-                *(self._audit_message_links(m, http_client, semaphore) for m in messages_with_links),
+                *(
+                    self._audit_message_links(m, http_client, semaphore)
+                    for m in messages_with_links
+                ),
                 return_exceptions=True,
             )
             for result in results:

@@ -155,7 +155,9 @@ async def test_complete_cleaner_lifecycle(tmp_path: Path):
     # Step 4: Pre-Deletion Backup & Paced Deletion Execution
     backup_mgr = BackupManager(str(backup_dir))
     mock_client = AsyncMock()
-    mock_client.get_messages.side_effect = lambda chat_id, ids: [SimpleNamespace(id=mid) for mid in ids]
+    mock_client.get_messages.side_effect = lambda chat_id, ids: [
+        SimpleNamespace(id=mid) for mid in ids
+    ]
 
     executor = DeletionExecutor(
         db=db,

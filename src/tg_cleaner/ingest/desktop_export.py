@@ -155,7 +155,9 @@ def import_desktop_export_payload(
     """Import a single-chat or complete multi-chat Telegram Desktop payload."""
     if not isinstance(data, dict):
         raise ValueError("Telegram Desktop export root must be a JSON object")
-    return [import_desktop_export_from_dict(chat_data, db) for chat_data in _validate_chat_payload(data)]
+    return [
+        import_desktop_export_from_dict(chat_data, db) for chat_data in _validate_chat_payload(data)
+    ]
 
 
 def parse_desktop_export_json(json_path: str | Path, db: DatabaseManager) -> dict[str, Any]:

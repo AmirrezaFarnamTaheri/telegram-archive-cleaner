@@ -146,14 +146,16 @@ class DeletionExecutor:
             fetched = await get_messages(chat_id, ids=chunk)
             if fetched is None:
                 fetched_list: list[Any] = []
-            elif isinstance(fetched, (list, tuple)):
+            elif isinstance(fetched, list | tuple):
                 fetched_list = list(fetched)
             else:
                 try:
                     fetched_list = list(fetched)
                 except TypeError:
                     fetched_list = [fetched]
-            fetched_ids = {int(msg.id) for msg in fetched_list if getattr(msg, "id", None) is not None}
+            fetched_ids = {
+                int(msg.id) for msg in fetched_list if getattr(msg, "id", None) is not None
+            }
             if fetched_ids != set(chunk):
                 missing = sorted(set(chunk) - fetched_ids)
                 raise RuntimeError(

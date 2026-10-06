@@ -13,8 +13,8 @@ from pydantic import BaseModel, Field
 
 from tg_cleaner.analyzer.dedupe import DeduplicationEngine
 from tg_cleaner.analyzer.links import LinkHealthChecker
-from tg_cleaner.analyzer.policy import PolicyAuditor
 from tg_cleaner.analyzer.llm import SemanticLLMAnalyzer
+from tg_cleaner.analyzer.policy import PolicyAuditor
 from tg_cleaner.analyzer.stale import StaleContentAnalyzer
 from tg_cleaner.cleaner.backup import BackupManager
 from tg_cleaner.cleaner.executor import DeletionExecutor, DeletionResult
@@ -279,7 +279,9 @@ async def import_desktop_export(
                 break
             content.extend(chunk)
             if len(content) > max_bytes:
-                raise HTTPException(status_code=413, detail="Import file exceeds configured size limit")
+                raise HTTPException(
+                    status_code=413, detail="Import file exceeds configured size limit"
+                )
         try:
             export_dict = json.loads(bytes(content).decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -287,11 +289,15 @@ async def import_desktop_export(
     else:
         body = await request.body()
         if len(body) > max_bytes:
-            raise HTTPException(status_code=413, detail="Import payload exceeds configured size limit")
+            raise HTTPException(
+                status_code=413, detail="Import payload exceeds configured size limit"
+            )
         try:
             export_dict = json.loads(body.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise HTTPException(status_code=400, detail="Invalid or missing JSON export payload") from exc
+            raise HTTPException(
+                status_code=400, detail="Invalid or missing JSON export payload"
+            ) from exc
 
     try:
         imported = import_desktop_export_payload(export_dict, db)
@@ -703,16 +709,16 @@ async def auth_send_code(payload: AuthSendCodeRequest, request: Request) -> dict
     from tg_cleaner.core.settings import settings, update_credentials_and_save
 
     update_credentials_and_save(
-            api_id=payload.api_id,
-            api_hash=payload.api_hash,
-            phone=payload.phone,
-            proxy_type=payload.proxy_type,
-            proxy_host=payload.proxy_host,
-            proxy_port=payload.proxy_port,
-            proxy_username=payload.proxy_username,
-            proxy_password=payload.proxy_password,
-            proxy_secret=payload.proxy_secret,
-        )
+        api_id=payload.api_id,
+        api_hash=payload.api_hash,
+        phone=payload.phone,
+        proxy_type=payload.proxy_type,
+        proxy_host=payload.proxy_host,
+        proxy_port=payload.proxy_port,
+        proxy_username=payload.proxy_username,
+        proxy_password=payload.proxy_password,
+        proxy_secret=payload.proxy_secret,
+    )
 
     request.app.state.client = None
 
@@ -729,7 +735,10 @@ async def auth_send_code(payload: AuthSendCodeRequest, request: Request) -> dict
         return {"phone_code_hash": phone_code_hash}
     except Exception as e:
         msg = str(e)
-        if any(term in msg.lower() for term in ["timeout", "timed out", "connection", "connect", "refused"]):
+        if any(
+            term in msg.lower()
+            for term in ["timeout", "timed out", "connection", "connect", "refused"]
+        ):
             msg += ". If direct access to Telegram MTProto is blocked by your network provider, please configure a SOCKS5 or HTTP proxy in the proxy settings."
         raise HTTPException(status_code=400, detail=msg) from e
 
@@ -815,7 +824,9 @@ async def list_telegram_dialogs(request: Request, limit: int = 100) -> list[Chat
         raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
     client = await _authorized_client(request)
     db: DatabaseManager = request.app.state.db
-    dialogs = await LiveIngestor(client, db, data_saver_mode=settings.data_saver_mode).list_dialogs(limit)
+    dialogs = await LiveIngestor(client, db, data_saver_mode=settings.data_saver_mode).list_dialogs(
+        limit
+    )
     for chat in dialogs:
         db.upsert_chat(chat)
     return dialogs
@@ -908,6 +919,7 @@ async def export_backup_to_cloud(
 ) -> dict[str, Any]:
     """Export a verified local backup archive to Google Drive or GitHub."""
     from tg_cleaner.cleaner.cloud_export import CloudExportManager
+
     manager = CloudExportManager(request.app.state.backup_manager.backup_dir)
     safe_name = sanitize_filename(filename)
     if safe_name != filename:

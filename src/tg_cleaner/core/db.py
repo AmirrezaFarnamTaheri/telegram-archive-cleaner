@@ -446,7 +446,9 @@ class DatabaseManager:
     def get_duplicate_group(self, group_id: str) -> DuplicateGroup | None:
         """Retrieve a specific duplicate group by its ID."""
         with self.get_connection() as conn:
-            row = conn.execute("SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)
+            ).fetchone()
             if not row:
                 return None
             return self._row_to_duplicate_group(row)
@@ -589,7 +591,9 @@ class DatabaseManager:
                 (chat_id, message_id, _utc_now_naive(), status, error_message),
             )
 
-    def list_deletion_logs(self, chat_id: int | None = None, limit: int = 500) -> list[dict[str, Any]]:
+    def list_deletion_logs(
+        self, chat_id: int | None = None, limit: int = 500
+    ) -> list[dict[str, Any]]:
         """Return recent deletion audit records."""
         with self.get_connection() as conn:
             if chat_id is None:

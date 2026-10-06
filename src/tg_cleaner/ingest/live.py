@@ -34,7 +34,7 @@ def _canonical_peer_id(entity: Any) -> int:
         raw_id = getattr(entity, "id", None)
         if isinstance(raw_id, int):
             return raw_id
-        raise ValueError("Could not determine Telegram chat id")
+        raise ValueError("Could not determine Telegram chat id") from None
 
 
 def _chat_type(entity: Any) -> str:
@@ -179,7 +179,7 @@ class LiveIngestor:
                         media_type = "audio"
                     elif "sticker" in attr_name:
                         media_type = "sticker"
-                    if isinstance(getattr(attr, "duration", None), (int, float)):
+                    if isinstance(getattr(attr, "duration", None), int | float):
                         duration = int(attr.duration)
                     if isinstance(getattr(attr, "w", None), int):
                         width = attr.w

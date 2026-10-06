@@ -12,7 +12,8 @@ import difflib
 import re
 import uuid
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from tg_cleaner.core.db import DatabaseManager
 from tg_cleaner.core.hashing import hamming_distance, token_sort_ratio
@@ -277,9 +278,7 @@ class DeduplicationEngine:
     ) -> list[tuple[DuplicateGroup, list[AnalysisFlag]]]:
         """Find visually similar images with dHash; results require manual approval."""
         candidates = [
-            m
-            for m in messages
-            if m.id not in seen_ids and m.media_type == "photo" and m.dhash
+            m for m in messages if m.id not in seen_ids and m.media_type == "photo" and m.dhash
         ]
         edges: list[tuple[int, int]] = []
         distances: dict[tuple[int, int], int] = {}
@@ -287,11 +286,16 @@ class DeduplicationEngine:
             for right in candidates[i + 1 :]:
                 if left.media_id and right.media_id and left.media_id == right.media_id:
                     continue
-                if left.width and right.width and left.height and right.height:
-                    if (left.width, left.height) != (right.width, right.height):
-                        # Different resolutions can still be the same visual, but requiring the
-                        # same geometry keeps this detector conservative.
-                        continue
+                if (
+                    left.width
+                    and right.width
+                    and left.height
+                    and right.height
+                    and (left.width, left.height) != (right.width, right.height)
+                ):
+                    # Different resolutions can still be the same visual, but requiring the
+                    # same geometry keeps this detector conservative.
+                    continue
                 distance = hamming_distance(left.dhash, right.dhash)
                 if distance <= DHASH_MAX_HAMMING_DISTANCE:
                     edges.append((left.id, right.id))
@@ -335,7 +339,9 @@ class DeduplicationEngine:
     ) -> list[tuple[DuplicateGroup, list[AnalysisFlag]]]:
         """Find near-duplicate text as review-only connected components."""
         candidates = [
-            m for m in messages if m.id not in seen_ids and len(m.text.strip()) >= MIN_TEXT_LENGTH_FOR_FUZZY
+            m
+            for m in messages
+            if m.id not in seen_ids and len(m.text.strip()) >= MIN_TEXT_LENGTH_FOR_FUZZY
         ]
         edges: list[tuple[int, int]] = []
         scores: dict[tuple[int, int], float] = {}
@@ -489,7 +495,7 @@ class DeduplicationEngine:
         messages = self.db.get_messages_by_ids(group.chat_id, group.message_ids)
         group.recommended_preset = preset
         group.primary_message_id = self._pick_primary_message_id(messages, preset)
-        group.diff_summary["requires_review"] = False if preset != RetentionPreset.WHITELIST_ALL else True
+        group.diff_summary["requires_review"] = preset == RetentionPreset.WHITELIST_ALL
         self.db.upsert_duplicate_group(group)
 
         flags = self._resolve_flags_for_group(group, messages, preset, explicit=True)

@@ -7,7 +7,6 @@ import pytest
 
 from tg_cleaner.analyzer.links import LinkHealthChecker
 from tg_cleaner.core.db import DatabaseManager
-
 from tg_cleaner.core.net_security import (
     guess_filename_from_url,
     is_private_ip,

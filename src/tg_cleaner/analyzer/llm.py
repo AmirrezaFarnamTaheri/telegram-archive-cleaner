@@ -158,7 +158,9 @@ class SemanticLLMAnalyzer:
                 "responseSchema": schema,
             },
         }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        )
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 url,

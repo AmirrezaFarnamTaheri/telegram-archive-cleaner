@@ -60,7 +60,14 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     openai_api_key: str | None = None
 
-    @field_validator("telegram_api_id", "telegram_proxy_port", "web_port", "max_import_bytes", "stale_after_days", mode="before")
+    @field_validator(
+        "telegram_api_id",
+        "telegram_proxy_port",
+        "web_port",
+        "max_import_bytes",
+        "stale_after_days",
+        mode="before",
+    )
     @classmethod
     def parse_empty_int(cls, v: Any) -> int | None:
         if v is None or v == "":

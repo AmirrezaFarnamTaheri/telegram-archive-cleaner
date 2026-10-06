@@ -121,7 +121,9 @@ async def test_deletion_executor_live_batching(
     backup_dir = tmp_path / "backups"
     backup_mgr = BackupManager(backup_dir=str(backup_dir))
     mock_client = AsyncMock()
-    mock_client.get_messages.side_effect = lambda chat_id, ids: [SimpleNamespace(id=mid) for mid in ids]
+    mock_client.get_messages.side_effect = lambda chat_id, ids: [
+        SimpleNamespace(id=mid) for mid in ids
+    ]
 
     executor = DeletionExecutor(
         db=test_db,
@@ -170,7 +172,9 @@ async def test_deletion_executor_flood_wait(
     backup_dir = tmp_path / "backups"
     backup_mgr = BackupManager(backup_dir=str(backup_dir))
     mock_client = AsyncMock()
-    mock_client.get_messages.side_effect = lambda chat_id, ids: [SimpleNamespace(id=mid) for mid in ids]
+    mock_client.get_messages.side_effect = lambda chat_id, ids: [
+        SimpleNamespace(id=mid) for mid in ids
+    ]
 
     # Raise flood wait once (1 sec), then succeed
     mock_client.delete_messages.side_effect = [

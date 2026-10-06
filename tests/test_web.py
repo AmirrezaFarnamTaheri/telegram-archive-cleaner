@@ -253,9 +253,7 @@ def test_api_backup_verify_endpoint(client: TestClient):
     assert len(verified.json()["sha256"]) == 64
 
 
-def test_api_does_not_serve_archive_controlled_local_paths(
-    web_db: DatabaseManager, tmp_path: Path
-):
+def test_api_does_not_serve_archive_controlled_local_paths(web_db: DatabaseManager, tmp_path: Path):
     """Desktop export file fields cannot be used as a local-file read primitive."""
     secret = tmp_path / "secret.jpg"
     secret.write_bytes(b"not really an image")
