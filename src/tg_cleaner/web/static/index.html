@@ -81,39 +81,50 @@
   class="bg-canvas text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500/30" 
   x-data="cleanerApp()" 
   x-init="init()" 
-  @keydown.escape.window="closeAllModals()" 
   x-cloak
 >
 
   <!-- Sticky Top Cockpit Bar -->
-  <header class="border-b border-borderSubtle bg-canvas/90 backdrop-blur-md sticky top-0 z-40 px-5 py-3 flex items-center justify-between">
+  <header role="banner" class="border-b border-borderSubtle bg-canvas/90 backdrop-blur-md sticky top-0 z-40 px-5 py-2.5 flex items-center justify-between">
     <div class="flex items-center space-x-3.5">
+      <!-- Sidebar Toggle Button -->
+      <button 
+        @click="sidebarOpen = !sidebarOpen" 
+        class="p-1.5 rounded-md bg-slate-900 border border-borderSubtle text-slate-400 hover:text-white transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
+        aria-label="Toggle Navigation Sidebar"
+        title="Toggle Sidebar"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+        </svg>
+      </button>
+
       <div class="w-8 h-8 rounded-md bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-mono font-bold text-xs tracking-wider shadow-inner">
         TG
       </div>
       <div>
         <div class="flex items-center space-x-2">
           <h1 class="text-sm font-bold tracking-tight text-white">Telegram Archive Cleaner</h1>
-          <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 text-slate-400">v1.2.0</span>
+          <span class="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-slate-800/80 border border-slate-700/60 text-slate-400">v1.2.0</span>
         </div>
-        <p class="text-[11px] text-slate-400">Visual deduplication, link validation & verified snapshot rollback</p>
+        <p class="text-[11px] text-slate-400 hidden sm:block">Visual deduplication, link validation & verified snapshot rollback</p>
       </div>
     </div>
 
     <!-- System Telemetry & Global Controls -->
-    <div class="flex items-center space-x-2.5">
+    <div class="flex items-center space-x-2">
       <!-- Database Status Indicator -->
-      <div class="flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border border-slate-800 bg-slate-900/60 font-mono">
+      <div class="flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border border-slate-800 bg-slate-900/60 font-mono" title="SQLite / WAL Storage Status">
         <span class="w-1.5 h-1.5 rounded-full" :class="dbHealthy ? 'bg-emerald-400' : 'bg-rose-500'"></span>
-        <span class="text-slate-300 text-[11px]" x-text="dbHealthy ? 'SQLite Active' : 'DB Disconnected'"></span>
+        <span class="text-slate-300 text-[11px]" x-text="dbHealthy ? 'SQLite Active' : 'DB Offline'"></span>
       </div>
 
       <!-- Edge Relay Indicator -->
-      <div class="flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border font-mono transition-colors" :class="relayConfigured ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-slate-900/60 border-slate-800 text-slate-400'">
+      <div class="flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border font-mono transition-colors" :class="relayConfigured ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-slate-900/60 border-slate-800 text-slate-400'" title="Edge Relay Traffic Proxy">
         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        <span class="text-[11px]" x-text="relayConfigured ? 'Relay (' + relayProvider + ')' : 'Direct Network'"></span>
+        <span class="text-[11px] hidden md:inline" x-text="relayConfigured ? 'Relay (' + relayProvider + ')' : 'Direct Network'"></span>
       </div>
 
       <!-- MTProto Authentication Trigger -->
@@ -125,7 +136,7 @@
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
-        <span x-text="telegramAuth ? 'Live MTProto Connected' : 'Connect MTProto'"></span>
+        <span class="hidden sm:inline" x-text="telegramAuth ? 'MTProto Connected' : 'Connect MTProto'"></span>
       </button>
 
       <!-- Import Desktop Archive -->
@@ -136,7 +147,16 @@
         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
-        <span>Import Desktop Export</span>
+        <span>Import JSON</span>
+      </button>
+
+      <!-- Keyboard Shortcuts Modal Trigger -->
+      <button 
+        @click="showShortcutsModal = true" 
+        class="px-2 py-1 text-xs font-mono rounded-md bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-borderSubtle active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none" 
+        title="Keyboard Shortcuts (?)"
+      >
+        ?
       </button>
 
       <!-- Sync / Refresh -->
@@ -144,6 +164,7 @@
         @click="refreshAll()" 
         class="p-1.5 text-xs rounded-md bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-borderSubtle active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none" 
         title="Sync Workspace"
+        aria-label="Refresh Workspace"
       >
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -153,15 +174,19 @@
   </header>
 
   <!-- Cockpit Work Environment -->
-  <div class="flex h-[calc(100vh-57px)]">
-    <!-- Left Navigation Sidebar -->
-    <aside class="w-64 border-r border-borderSubtle bg-canvas/60 p-3.5 flex flex-col space-y-3 shrink-0">
+  <div class="flex h-[calc(100vh-53px)]">
+    <!-- Left Navigation Sidebar (Collapsible) -->
+    <aside 
+      x-show="sidebarOpen" 
+      role="navigation" 
+      class="w-64 border-r border-borderSubtle bg-canvas/60 p-3.5 flex flex-col space-y-3 shrink-0 transition-all duration-200"
+    >
       <div class="flex items-center justify-between px-1">
         <h2 class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Indexed Sources</h2>
         <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400" x-text="chats.length"></span>
       </div>
 
-      <!-- Demo Ingestion Trigger -->
+      <!-- Demo Sandbox Ingestion Trigger -->
       <button 
         @click="generateDemoData()" 
         class="w-full py-1.5 px-2.5 text-xs font-medium rounded-md bg-sky-950/30 hover:bg-sky-900/50 border border-sky-800/50 text-sky-300 transition-all active:scale-[0.98] flex items-center justify-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
@@ -195,22 +220,65 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
           <p class="font-medium">No archive loaded</p>
-          <p class="text-[11px] text-slate-500 mt-1">Import a Telegram Desktop export or connect MTProto above.</p>
+          <p class="text-[11px] text-slate-500 mt-1">Import a Telegram Desktop export or click demo above.</p>
         </div>
       </div>
     </aside>
 
     <!-- Center Workspace -->
-    <main class="flex-1 flex flex-col overflow-y-auto bg-canvas p-5 space-y-5">
-      <!-- Empty State -->
-      <div x-show="!selectedChat" class="text-center py-28 text-slate-500">
+    <main role="main" class="flex-1 flex flex-col overflow-y-auto bg-canvas p-4 sm:p-5 space-y-4">
+      
+      <!-- Interactive Onboarding Quick-Start Guide -->
+      <div 
+        x-show="showOnboardingGuide && chats.length === 0" 
+        class="bg-surface border border-sky-900/50 rounded-lg p-5 space-y-4 shadow-sm"
+      >
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+              <span>Quick Start: 3-Step Forensic Archive Workflow</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Zero data loss curation for dense Telegram archives and Saved Messages</p>
+          </div>
+          <button @click="showOnboardingGuide = false" class="text-xs text-slate-500 hover:text-white font-mono">&times; Dismiss</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
+            <div class="text-[10px] font-mono text-sky-400 font-bold uppercase">1. Ingest Source</div>
+            <p class="text-xs font-semibold text-slate-200">Load Archive</p>
+            <p class="text-[11px] text-slate-400">Import a Desktop <code class="text-sky-300 font-mono">result.json</code> file, link your MTProto account, or load sample fixtures.</p>
+            <div class="pt-2">
+              <button @click="generateDemoData()" class="px-2 py-1 text-xs font-mono rounded bg-sky-950/60 hover:bg-sky-900 text-sky-300 border border-sky-800/60 transition active:scale-[0.98]">
+                Launch Demo Sandbox →
+              </button>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
+            <div class="text-[10px] font-mono text-emerald-400 font-bold uppercase">2. Audit & Deduplicate</div>
+            <p class="text-xs font-semibold text-slate-200">Run Scan</p>
+            <p class="text-[11px] text-slate-400">Exact SHA-256 binary matching, perceptual image hashing (dHash/pHash), and dead link validation via edge relays.</p>
+          </div>
+
+          <div class="p-3.5 rounded-md bg-canvas/60 border border-borderSubtle space-y-1.5">
+            <div class="text-[10px] font-mono text-amber-400 font-bold uppercase">3. Safe Deletion</div>
+            <p class="text-xs font-semibold text-slate-200">Zero Data Loss</p>
+            <p class="text-[11px] text-slate-400">Every deletion automatically saves a cryptographically verified SHA-256 snapshot to <code class="text-slate-300 font-mono">backups/</code> with dry-run support.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State When No Chat is Selected -->
+      <div x-show="!selectedChat" class="text-center py-20 text-slate-500">
         <div class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
         <h3 class="text-sm font-semibold text-slate-300">Select an archive source</h3>
-        <p class="text-xs text-slate-500 mt-1">Choose a chat from the index or import an export file to launch deduplication audit.</p>
+        <p class="text-xs text-slate-500 mt-1">Choose a chat from the index or click "Load Interactive Demo" to start analyzing.</p>
       </div>
 
       <!-- Active Chat Workspace -->
@@ -220,7 +288,7 @@
           <div>
             <div class="flex items-center space-x-2.5">
               <h2 class="text-base font-bold text-white tracking-tight" x-text="selectedChat?.title"></h2>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-800/50" x-text="selectedChat?.chat_type"></span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-800/50 uppercase" x-text="selectedChat?.chat_type"></span>
             </div>
             <p class="text-[11px] font-mono text-slate-400 mt-0.5" x-text="`Target ID: ${selectedChat?.id} • Indexed Records: ${stats?.total_messages || 0}`"></p>
           </div>
@@ -237,7 +305,7 @@
             </button>
 
             <button 
-              @click="showDeleteModal = true"
+              @click="showDeleteModal = true" 
               :disabled="selectedCandidateIds.length === 0"
               class="px-3.5 py-1.5 text-xs font-semibold rounded-md bg-rose-600 hover:bg-rose-500 text-white transition active:scale-[0.98] flex items-center space-x-1.5 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
             >
@@ -247,41 +315,84 @@
           </div>
         </div>
 
-        <!-- Cockpit Telemetry Ribbon (7-Point High Density Metrics) -->
+        <!-- Cockpit Telemetry Ribbon (Interactive 7-Point High Density Metrics) -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
           <div class="bg-surface/80 border border-borderSubtle p-3 rounded-md">
             <div class="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Messages</div>
             <div class="text-lg font-bold font-mono tabular-nums text-slate-100 mt-1" x-text="stats?.total_messages || 0"></div>
           </div>
-          <div class="bg-surface/80 border border-borderSubtle p-3 rounded-md">
-            <div class="text-[10px] text-amber-400/90 font-mono uppercase tracking-wider">Exact Dupes</div>
+          
+          <div 
+            @click="filterByKpi('exact')" 
+            class="bg-surface/80 border border-borderSubtle p-3 rounded-md cursor-pointer hover:border-amber-600/50 transition-colors"
+            title="Click to view exact duplicates"
+          >
+            <div class="text-[10px] text-amber-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
+              <span>Exact Dupes</span>
+              <span class="text-[9px] text-slate-500">→</span>
+            </div>
             <div class="text-lg font-bold font-mono tabular-nums text-amber-400 mt-1" x-text="stats?.exact_duplicates || 0"></div>
           </div>
-          <div class="bg-sky-950/20 border border-sky-900/50 p-3 rounded-md">
-            <div class="text-[10px] text-sky-400 font-mono uppercase tracking-wider">Same Media Diff</div>
+
+          <div 
+            @click="filterByKpi('diff')" 
+            class="bg-sky-950/20 border border-sky-900/50 p-3 rounded-md cursor-pointer hover:border-sky-500/60 transition-colors"
+            title="Click to view Same Media / Diff Caption groups"
+          >
+            <div class="text-[10px] text-sky-400 font-mono uppercase tracking-wider flex items-center justify-between">
+              <span>Same Media Diff</span>
+              <span class="text-[9px] text-slate-500">→</span>
+            </div>
             <div class="text-lg font-bold font-mono tabular-nums text-sky-300 mt-1" x-text="stats?.same_media_diff_caption || 0"></div>
           </div>
-          <div class="bg-surface/80 border border-borderSubtle p-3 rounded-md">
-            <div class="text-[10px] text-rose-400/90 font-mono uppercase tracking-wider">Dead Links</div>
+
+          <div 
+            @click="filterByKpi('link')" 
+            class="bg-surface/80 border border-borderSubtle p-3 rounded-md cursor-pointer hover:border-rose-600/50 transition-colors"
+            title="Click to filter dead links"
+          >
+            <div class="text-[10px] text-rose-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
+              <span>Dead Links</span>
+              <span class="text-[9px] text-slate-500">→</span>
+            </div>
             <div class="text-lg font-bold font-mono tabular-nums text-rose-400 mt-1" x-text="stats?.dead_links || 0"></div>
           </div>
+
           <div class="bg-surface/80 border border-borderSubtle p-3 rounded-md">
             <div class="text-[10px] text-purple-400/90 font-mono uppercase tracking-wider">Policy Flags</div>
             <div class="text-lg font-bold font-mono tabular-nums text-purple-400 mt-1" x-text="stats?.policy_restricted || 0"></div>
           </div>
-          <div class="bg-rose-950/20 border border-rose-900/50 p-3 rounded-md">
-            <div class="text-[10px] text-rose-400 font-mono uppercase tracking-wider">Candidates</div>
+
+          <div 
+            @click="filterByKpi('candidates')" 
+            class="bg-rose-950/20 border border-rose-900/50 p-3 rounded-md cursor-pointer hover:border-rose-500/60 transition-colors"
+            title="Click to view all candidates"
+          >
+            <div class="text-[10px] text-rose-400 font-mono uppercase tracking-wider flex items-center justify-between">
+              <span>Candidates</span>
+              <span class="text-[9px] text-slate-500">→</span>
+            </div>
             <div class="text-lg font-bold font-mono tabular-nums text-rose-300 mt-1" x-text="stats?.total_deletion_candidates || 0"></div>
           </div>
-          <div class="bg-emerald-950/20 border border-emerald-900/50 p-3 rounded-md">
-            <div class="text-[10px] text-emerald-400 font-mono uppercase tracking-wider">Reclaimable</div>
+
+          <div 
+            @click="filterByKpi('backups')" 
+            class="bg-emerald-950/20 border border-emerald-900/50 p-3 rounded-md cursor-pointer hover:border-emerald-500/60 transition-colors"
+            title="Click to inspect rollback backups"
+          >
+            <div class="text-[10px] text-emerald-400 font-mono uppercase tracking-wider flex items-center justify-between">
+              <span>Reclaimable</span>
+              <span class="text-[9px] text-slate-500">→</span>
+            </div>
             <div class="text-lg font-bold font-mono tabular-nums text-emerald-400 mt-1" x-text="formatBytes(stats?.estimated_reclaimable_bytes || 0)"></div>
           </div>
         </div>
 
         <!-- Navigation Tabs -->
-        <div class="border-b border-borderSubtle flex items-center space-x-6 text-xs font-semibold pt-1">
+        <div role="tablist" class="border-b border-borderSubtle flex items-center space-x-6 text-xs font-semibold pt-1">
           <button 
+            role="tab"
+            :aria-selected="activeTab === 'candidates'"
             @click="activeTab = 'candidates'" 
             class="transition-colors pb-2.5 border-b-2 flex items-center space-x-1.5 focus:outline-none"
             :class="activeTab === 'candidates' ? 'text-sky-400 border-sky-400' : 'text-slate-400 hover:text-slate-200 border-transparent'"
@@ -289,7 +400,10 @@
             <span>Deletion Candidates</span>
             <span class="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300" x-text="candidates.length"></span>
           </button>
+          
           <button 
+            role="tab"
+            :aria-selected="activeTab === 'diffs'"
             @click="activeTab = 'diffs'" 
             class="transition-colors pb-2.5 border-b-2 flex items-center space-x-1.5 focus:outline-none"
             :class="activeTab === 'diffs' ? 'text-sky-400 border-sky-400' : 'text-slate-400 hover:text-slate-200 border-transparent'"
@@ -297,7 +411,10 @@
             <span>Same Media / Diff Caption Groups</span>
             <span class="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300" x-text="diffGroups.length"></span>
           </button>
+          
           <button 
+            role="tab"
+            :aria-selected="activeTab === 'backups'"
             @click="activeTab = 'backups'" 
             class="transition-colors pb-2.5 border-b-2 flex items-center space-x-1.5 focus:outline-none"
             :class="activeTab === 'backups' ? 'text-sky-400 border-sky-400' : 'text-slate-400 hover:text-slate-200 border-transparent'"
@@ -308,34 +425,34 @@
         </div>
 
         <!-- TAB 1: Deletion Candidates List -->
-        <div x-show="activeTab === 'candidates'" class="space-y-3">
+        <div x-show="activeTab === 'candidates'" role="tabpanel" class="space-y-3">
           <!-- Filter Chips & Search Bar -->
           <div class="flex flex-wrap items-center justify-between gap-2 bg-surface/60 p-2.5 rounded-md border border-borderSubtle">
             <div class="flex items-center space-x-1.5 text-xs">
               <span class="text-[11px] font-mono text-slate-500 uppercase mr-1">Filter:</span>
               <button 
-                @click="candidateFilter = 'all'" 
+                @click="candidateFilter = 'all'; page = 1" 
                 class="px-2 py-0.8 rounded text-[11px] font-medium transition active:scale-[0.98]"
                 :class="candidateFilter === 'all' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
               >
                 All (<span x-text="candidates.length"></span>)
               </button>
               <button 
-                @click="candidateFilter = 'exact'" 
+                @click="candidateFilter = 'exact'; page = 1" 
                 class="px-2 py-0.8 rounded text-[11px] font-medium transition active:scale-[0.98]"
                 :class="candidateFilter === 'exact' ? 'bg-amber-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
               >
                 Exact Dupes
               </button>
               <button 
-                @click="candidateFilter = 'diff'" 
+                @click="candidateFilter = 'diff'; page = 1" 
                 class="px-2 py-0.8 rounded text-[11px] font-medium transition active:scale-[0.98]"
                 :class="candidateFilter === 'diff' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
               >
                 Same Media Diff
               </button>
               <button 
-                @click="candidateFilter = 'link'" 
+                @click="candidateFilter = 'link'; page = 1" 
                 class="px-2 py-0.8 rounded text-[11px] font-medium transition active:scale-[0.98]"
                 :class="candidateFilter === 'link' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
               >
@@ -346,28 +463,34 @@
             <!-- Search Field -->
             <div class="relative w-64">
               <input 
+                id="candidateSearchInput"
                 type="text" 
                 x-model="searchQuery" 
-                placeholder="Search candidates text / ID..." 
+                @input="page = 1"
+                placeholder="Search text / ID (Press /)..." 
                 class="w-full px-2.5 py-1 text-xs bg-canvas border border-slate-800 rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono"
               >
-              <button x-show="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-1.5 text-slate-500 hover:text-white text-xs">&times;</button>
+              <button x-show="searchQuery" @click="searchQuery = ''; page = 1" class="absolute right-2 top-1.5 text-slate-500 hover:text-white text-xs">&times;</button>
             </div>
           </div>
 
-          <!-- Selection Controls Bar -->
+          <!-- Selection Controls Bar & Pagination Indicator -->
           <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1">
             <div class="flex items-center space-x-2">
-              <button @click="selectAllCandidates()" class="hover:text-sky-400 underline transition">Select All Visible</button>
+              <button @click="selectAllCandidates()" class="hover:text-sky-400 underline transition">Select All Filtered</button>
               <span>•</span>
               <button @click="deselectAllCandidates()" class="hover:text-sky-400 underline transition">Deselect All</button>
             </div>
-            <span x-text="`${selectedCandidateIds.length} candidate(s) staged for deletion`"></span>
+            <div>
+              <span x-text="`${selectedCandidateIds.length} candidate(s) selected`"></span>
+              <span class="text-slate-600 mx-1">|</span>
+              <span x-text="`Page ${page} of ${totalPages()}`"></span>
+            </div>
           </div>
 
-          <!-- Candidates Rows -->
+          <!-- Paginated Candidates Rows -->
           <div class="space-y-1.5">
-            <template x-for="cand in filteredCandidates()" :key="cand.id">
+            <template x-for="cand in paginatedCandidates()" :key="cand.id">
               <div class="p-3 rounded-md border border-borderSubtle bg-surface/40 flex items-start space-x-3 hover:border-slate-700 hover:bg-surface/70 transition">
                 <input 
                   type="checkbox" 
@@ -400,6 +523,7 @@
                 </div>
               </div>
             </template>
+            
             <div x-show="filteredCandidates().length === 0" class="text-center py-14 text-slate-500 text-xs">
               <svg class="w-7 h-7 mx-auto text-slate-600 mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -407,10 +531,29 @@
               No matching deletion candidates in this view.
             </div>
           </div>
+
+          <!-- Pagination Bar -->
+          <div x-show="totalPages() > 1" class="flex items-center justify-between pt-2 border-t border-borderSubtle text-xs font-mono">
+            <button 
+              @click="prevPage()" 
+              :disabled="page === 1"
+              class="px-2.5 py-1 rounded bg-slate-900 border border-borderSubtle text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              ← Previous
+            </button>
+            <span class="text-slate-400 text-[11px]" x-text="`Showing ${((page-1)*pageSize)+1}–${Math.min(page*pageSize, filteredCandidates().length)} of ${filteredCandidates().length}`"></span>
+            <button 
+              @click="nextPage()" 
+              :disabled="page === totalPages()"
+              class="px-2.5 py-1 rounded bg-slate-900 border border-borderSubtle text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              Next →
+            </button>
+          </div>
         </div>
 
         <!-- TAB 2: Same Media / Diff Caption Comparison Groups -->
-        <div x-show="activeTab === 'diffs'" class="space-y-4">
+        <div x-show="activeTab === 'diffs'" role="tabpanel" class="space-y-4">
           <template x-for="grp in diffGroups" :key="grp.group_id">
             <div class="bg-surface/60 border border-borderSubtle rounded-lg p-4 space-y-3.5 shadow-sm">
               <div class="flex items-center justify-between border-b border-borderSubtle/60 pb-2.5">
@@ -449,21 +592,27 @@
                         <span 
                           class="text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider"
                           :class="grp.suggested_keep_id === msg.id ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-rose-900/60 text-rose-300 border border-rose-700'"
-                          x-text="grp.suggested_keep_id === msg.id ? 'PRESERVE' : 'TARGET FOR DELETION'"
+                          x-text="grp.suggested_keep_id === msg.id ? 'PRESERVE (Keeper)' : 'CANDIDATE (Delete)'"
                         ></span>
                       </div>
                       <div class="relative group cursor-pointer mb-2" @click="openMediaInspect(selectedChat.id, msg.id, msg.text)">
                         <img 
                           :src="`/api/media/${selectedChat.id}/${msg.id}`" 
+                          loading="lazy"
                           @error="$el.style.display='none'" 
                           class="w-full max-h-40 object-cover rounded border border-borderSubtle"
                           alt="Media Thumbnail"
                         >
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white font-mono">
-                          Click to enlarge
+                          Inspect Resolution
                         </div>
                       </div>
-                      <div class="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-canvas p-2.5 rounded border border-borderSubtle" x-text="msg.text || '[No caption]'"></div>
+                      
+                      <!-- Caption Display with Diff Highlighting -->
+                      <div class="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-canvas p-2.5 rounded border border-borderSubtle">
+                        <div class="text-[10px] font-mono text-slate-500 mb-1 uppercase">Caption:</div>
+                        <div x-html="renderCaptionDiff(grp.messages.find(m => m.id === grp.suggested_keep_id)?.text, msg.text)"></div>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -476,7 +625,7 @@
         </div>
 
         <!-- TAB 3: Backups Archive -->
-        <div x-show="activeTab === 'backups'" class="space-y-3">
+        <div x-show="activeTab === 'backups'" role="tabpanel" class="space-y-3">
           <div class="flex items-center justify-between text-xs text-slate-400">
             <p>Cryptographic snapshot log: Local SHA-256 pre-deletion verification before execution.</p>
             <span class="font-mono text-[11px]" x-text="`${backups.length} snapshots recorded`"></span>
@@ -491,7 +640,7 @@
                   <th class="p-3">Count</th>
                   <th class="p-3">SHA-256 Checksum</th>
                   <th class="p-3">Size</th>
-                  <th class="p-3 text-right">Offsite Storage</th>
+                  <th class="p-3 text-right">Offsite Action</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-borderSubtle bg-surface/40">
@@ -507,6 +656,7 @@
                           @click="copyToClipboard(b.sha256, 'Checksum')" 
                           class="text-slate-500 hover:text-sky-400 p-0.5 rounded transition"
                           title="Copy Full Checksum"
+                          aria-label="Copy SHA-256 Checksum"
                         >
                           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -540,14 +690,14 @@
   </div>
 
   <!-- Modal: Import Desktop Archive -->
-  <div x-show="showImportModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showImportModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-lg w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
           <h3 class="text-sm font-bold text-white">Import Telegram Desktop JSON</h3>
           <p class="text-xs text-slate-400">Offline ingestion of <code class="text-sky-300 font-mono">result.json</code> archives</p>
         </div>
-        <button @click="showImportModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+        <button @click="showImportModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -564,14 +714,14 @@
   </div>
 
   <!-- Modal: Batch Deletion Confirmation -->
-  <div x-show="showDeleteModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showDeleteModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
           <h3 class="text-sm font-bold text-white">Execute Deletion Batch</h3>
           <p class="text-xs text-slate-400">Zero data loss safety protocol enforced</p>
         </div>
-        <button @click="showDeleteModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+        <button @click="showDeleteModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -597,14 +747,21 @@
             <div class="text-[11px] text-slate-400">Verifies backup creation without dispatching Telegram deletion API</div>
           </div>
         </label>
+
+        <div x-show="!dryRunMode" class="p-3 bg-rose-950/20 rounded border border-rose-900/50">
+          <label class="flex items-start space-x-2 cursor-pointer">
+            <input type="checkbox" x-model="confirmDeleteAcknowledge" class="mt-0.5 rounded bg-slate-900 border-rose-800 text-rose-500 focus:ring-0">
+            <span class="text-[11px] text-rose-200">I confirm that I want to delete these messages from Telegram. I understand they can only be restored via the generated local JSON snapshot.</span>
+          </label>
+        </div>
       </div>
 
       <div class="flex justify-end space-x-2 pt-1 border-t border-borderSubtle">
         <button @click="showDeleteModal = false" class="px-3.5 py-1.5 text-xs rounded bg-slate-800 text-slate-300 hover:bg-slate-700 transition">Cancel</button>
         <button 
           @click="executeBatchDelete()" 
-          :disabled="deleting"
-          class="px-4 py-1.5 text-xs font-semibold rounded bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 transition active:scale-[0.98]"
+          :disabled="deleting || (!dryRunMode && !confirmDeleteAcknowledge)"
+          class="px-4 py-1.5 text-xs font-semibold rounded bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-40 transition active:scale-[0.98]"
         >
           <span x-text="deleting ? 'Executing...' : (dryRunMode ? 'Simulate Deletion' : 'Confirm & Delete')"></span>
         </button>
@@ -613,14 +770,14 @@
   </div>
 
   <!-- Modal: MTProto Authentication -->
-  <div x-show="showAuthModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showAuthModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
           <h3 class="text-sm font-bold text-white">Telegram MTProto Connection</h3>
           <p class="text-xs text-slate-400">Direct client protocol authentication</p>
         </div>
-        <button @click="showAuthModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+        <button @click="showAuthModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -628,8 +785,9 @@
       <!-- Step 1: Phone -->
       <div x-show="authStep === 'phone'" class="space-y-3.5">
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1.5">Phone Number (International format)</label>
+          <label for="authPhoneInput" class="block text-xs font-medium text-slate-300 mb-1.5">Phone Number (International format)</label>
           <input 
+            id="authPhoneInput"
             type="tel" 
             x-model="authPhone" 
             placeholder="+1234567890" 
@@ -654,8 +812,9 @@
       <!-- Step 2: Code -->
       <div x-show="authStep === 'code'" class="space-y-3.5">
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1.5">Telegram Security Code</label>
+          <label for="authCodeInput" class="block text-xs font-medium text-slate-300 mb-1.5">Telegram Security Code</label>
           <input 
+            id="authCodeInput"
             type="text" 
             x-model="authCode" 
             placeholder="12345" 
@@ -686,8 +845,9 @@
       <!-- Step 3: Password -->
       <div x-show="authStep === 'password'" class="space-y-3.5">
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1.5">Two-Factor Authentication Password</label>
+          <label for="authPasswordInput" class="block text-xs font-medium text-slate-300 mb-1.5">Two-Factor Authentication Password</label>
           <input 
+            id="authPasswordInput"
             type="password" 
             x-model="authPassword" 
             placeholder="Account Password" 
@@ -712,14 +872,14 @@
   </div>
 
   <!-- Modal: Offsite Cloud Backup Export -->
-  <div x-show="showCloudExportModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showCloudExportModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
           <h3 class="text-sm font-bold text-white">Offsite Snapshot Export</h3>
           <p class="text-xs text-slate-400">Stream verified archive to offsite cloud repository</p>
         </div>
-        <button @click="showCloudExportModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+        <button @click="showCloudExportModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -732,8 +892,9 @@
 
       <div class="space-y-3">
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Target Cloud Provider</label>
+          <label for="cloudProviderSelect" class="block text-xs font-medium text-slate-300 mb-1">Target Cloud Provider</label>
           <select 
+            id="cloudProviderSelect"
             x-model="cloudProvider" 
             class="w-full px-2.5 py-1.5 bg-canvas border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
           >
@@ -743,8 +904,9 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1" x-text="cloudProvider === 'github' ? 'GitHub Personal Access Token (repo scope)' : 'Google OAuth Access Token'"></label>
+          <label for="cloudTokenInput" class="block text-xs font-medium text-slate-300 mb-1" x-text="cloudProvider === 'github' ? 'GitHub Personal Access Token (repo scope)' : 'Google OAuth Access Token'"></label>
           <input 
+            id="cloudTokenInput"
             type="password" 
             x-model="cloudToken" 
             placeholder="Access Token" 
@@ -753,8 +915,9 @@
         </div>
 
         <div x-show="cloudProvider === 'github'">
-          <label class="block text-xs font-medium text-slate-300 mb-1">Repository Target (owner/repo)</label>
+          <label for="cloudRepoInput" class="block text-xs font-medium text-slate-300 mb-1">Repository Target (owner/repo)</label>
           <input 
+            id="cloudRepoInput"
             type="text" 
             x-model="cloudRepo" 
             placeholder="my-org/telegram-backups" 
@@ -763,8 +926,9 @@
         </div>
 
         <div x-show="cloudProvider === 'google_drive'">
-          <label class="block text-xs font-medium text-slate-300 mb-1">Google Drive Folder ID (optional)</label>
+          <label for="cloudFolderInput" class="block text-xs font-medium text-slate-300 mb-1">Google Drive Folder ID (optional)</label>
           <input 
+            id="cloudFolderInput"
             type="text" 
             x-model="cloudFolderId" 
             placeholder="root or folder-id" 
@@ -788,14 +952,14 @@
   </div>
 
   <!-- Modal: Media Visual Lightbox Inspection -->
-  <div x-show="showMediaModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+  <div x-show="showMediaModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-2xl w-full p-5 space-y-3 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2">
         <div class="flex items-center space-x-2">
           <span class="text-xs font-bold text-white font-mono" x-text="`Media #${inspectMediaId}`"></span>
           <span class="text-xs text-slate-400 truncate max-w-md" x-text="inspectMediaTitle"></span>
         </div>
-        <button @click="showMediaModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+        <button @click="showMediaModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -808,6 +972,54 @@
         <span>Perceptual Hash Verified Inspection</span>
         <button @click="showMediaModal = false" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
           Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Keyboard Shortcuts Guide -->
+  <div x-show="showShortcutsModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl font-mono text-xs">
+      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
+        <div>
+          <h3 class="text-sm font-bold text-white font-sans">Keyboard Navigation</h3>
+          <p class="text-slate-400 text-[11px]">Cockpit productivity shortcuts</p>
+        </div>
+        <button @click="showShortcutsModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="space-y-2 text-slate-300">
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Show Shortcuts Guide</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">?</kbd>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Deletion Candidates Tab</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">1</kbd>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Same Media Diff Groups Tab</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">2</kbd>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Pre-Deletion Backups Tab</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">3</kbd>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Search Candidates Filter</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">/</kbd>
+        </div>
+        <div class="flex items-center justify-between p-2 rounded bg-canvas border border-borderSubtle">
+          <span>Dismiss Modals / Clear</span>
+          <kbd class="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-white font-bold">Esc</kbd>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button @click="showShortcutsModal = false" class="px-3 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+          Close
         </button>
       </div>
     </div>
@@ -835,7 +1047,7 @@
         <!-- Content -->
         <div class="flex-1 min-w-0" x-text="toast.message"></div>
         <!-- Dismiss -->
-        <button @click="removeToast(toast.id)" class="text-slate-500 hover:text-white p-0.5 rounded shrink-0">
+        <button @click="removeToast(toast.id)" aria-label="Dismiss Notification" class="text-slate-500 hover:text-white p-0.5 rounded shrink-0">
           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>

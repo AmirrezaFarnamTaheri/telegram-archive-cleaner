@@ -1,11 +1,13 @@
 /**
  * Alpine.js application state & controller for Telegram Archive Cleaner
- * Forensic, accessible, zero-slop architecture with non-blocking toast notifications
+ * Forensic, accessible, zero-slop architecture with non-blocking toast notifications,
+ * client-side pagination, keyboard navigation, and caption diff analysis.
  */
 
 function cleanerApp() {
   return {
     dbHealthy: true,
+    dbCheckInterval: null,
     chats: [],
     selectedChat: null,
     stats: null,
@@ -19,6 +21,16 @@ function cleanerApp() {
     scanning: false,
     deleting: false,
     dryRunMode: true,
+    confirmDeleteAcknowledge: false,
+
+    // Pagination for high-density scalability
+    page: 1,
+    pageSize: 30,
+
+    // Layout & UI Shell
+    sidebarOpen: true,
+    showShortcutsModal: false,
+    showOnboardingGuide: false,
 
     // Modals
     showImportModal: false,
@@ -51,7 +63,7 @@ function cleanerApp() {
     cloudFolderId: '',
     cloudExporting: false,
 
-    // Toast Notification System
+    // Toast Notification Stack
     toasts: [],
     toastCounter: 0,
 
@@ -61,6 +73,40 @@ function cleanerApp() {
       await this.checkRelayStatus();
       await this.loadChats();
       await this.loadBackups();
+
+      // Check if first-run without chats
+      if (this.chats.length === 0) {
+        this.showOnboardingGuide = true;
+      }
+
+      // Keyboard navigation listener
+      window.addEventListener('keydown', (e) => {
+        // Skip if typing in an input or textarea
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+          if (e.key === 'Escape') {
+            document.activeElement.blur();
+            this.closeAllModals();
+          }
+          return;
+        }
+
+        if (e.key === '?') {
+          e.preventDefault();
+          this.showShortcutsModal = !this.showShortcutsModal;
+        } else if (e.key === '1') {
+          this.activeTab = 'candidates';
+        } else if (e.key === '2') {
+          this.activeTab = 'diffs';
+        } else if (e.key === '3') {
+          this.activeTab = 'backups';
+        } else if (e.key === '/') {
+          e.preventDefault();
+          const searchInput = document.getElementById('candidateSearchInput');
+          if (searchInput) searchInput.focus();
+        } else if (e.key === 'Escape') {
+          this.closeAllModals();
+        }
+      });
     },
 
     showToast(message, type = 'info', duration = 4000) {
@@ -81,6 +127,8 @@ function cleanerApp() {
       this.showAuthModal = false;
       this.showCloudExportModal = false;
       this.showMediaModal = false;
+      this.showShortcutsModal = false;
+      this.confirmDeleteAcknowledge = false;
     },
 
     async checkRelayStatus() {
@@ -117,7 +165,8 @@ function cleanerApp() {
           if (demoChat) {
             await this.selectChat(demoChat);
           }
-          this.showToast('Interactive demo archive loaded successfully', 'success');
+          this.showOnboardingGuide = false;
+          this.showToast('Interactive sandbox archive loaded with perceptual & link fixtures', 'success');
         } else {
           this.showToast('Failed to load demo data', 'error');
         }
@@ -142,7 +191,7 @@ function cleanerApp() {
           this.showToast('Verification code dispatched to your Telegram app', 'info');
         } else {
           const err = await res.json();
-          this.showToast(`Error: ${err.detail || 'Failed to dispatch code'}`, 'error');
+          this.showToast(`Authentication error: ${err.detail || 'Failed to dispatch code'}`, 'error');
         }
       } catch (e) {
         this.showToast(`Network error: ${e.message}`, 'error');
@@ -181,7 +230,7 @@ function cleanerApp() {
           }
         }
       } catch (e) {
-        this.showToast(`Sign-in network error: ${e.message}`, 'error');
+        this.showToast(`Sign-in error: ${e.message}`, 'error');
       } finally {
         this.authLoading = false;
       }
@@ -213,6 +262,7 @@ function cleanerApp() {
 
     async selectChat(chat) {
       this.selectedChat = chat;
+      this.page = 1;
       await this.loadChatDetails(chat.id);
     },
 
@@ -275,6 +325,47 @@ function cleanerApp() {
       return list;
     },
 
+    paginatedCandidates() {
+      const all = this.filteredCandidates();
+      const start = (this.page - 1) * this.pageSize;
+      return all.slice(start, start + this.pageSize);
+    },
+
+    totalPages() {
+      const total = this.filteredCandidates().length;
+      return Math.max(1, Math.ceil(total / this.pageSize));
+    },
+
+    nextPage() {
+      if (this.page < this.totalPages()) {
+        this.page++;
+      }
+    },
+
+    prevPage() {
+      if (this.page > 1) {
+        this.page--;
+      }
+    },
+
+    // Interactive Telemetry Navigation: Clicking KPI cards switches tabs & filters
+    filterByKpi(kpiType) {
+      if (kpiType === 'exact') {
+        this.activeTab = 'candidates';
+        this.candidateFilter = 'exact';
+      } else if (kpiType === 'diff') {
+        this.activeTab = 'diffs';
+      } else if (kpiType === 'link') {
+        this.activeTab = 'candidates';
+        this.candidateFilter = 'link';
+      } else if (kpiType === 'candidates') {
+        this.activeTab = 'candidates';
+        this.candidateFilter = 'all';
+      } else if (kpiType === 'backups') {
+        this.activeTab = 'backups';
+      }
+    },
+
     async runScan() {
       if (!this.selectedChat) return;
       this.scanning = true;
@@ -284,7 +375,7 @@ function cleanerApp() {
           const data = await res.json();
           this.stats = data.stats;
           await this.loadChatDetails(this.selectedChat.id);
-          this.showToast(`Full audit completed: ${this.candidates.length} candidates flagged`, 'success');
+          this.showToast(`Full audit completed: ${this.candidates.length} candidates identified`, 'success');
         } else {
           const err = await res.json();
           this.showToast(`Audit failed: ${err.detail || 'Server error'}`, 'error');
@@ -321,6 +412,11 @@ function cleanerApp() {
 
     async executeBatchDelete() {
       if (!this.selectedChat || this.selectedCandidateIds.length === 0) return;
+      if (!this.dryRunMode && !this.confirmDeleteAcknowledge) {
+        this.showToast('Please confirm the safety rollback acknowledgement before live deletion', 'warning');
+        return;
+      }
+
       this.deleting = true;
       try {
         const res = await fetch(`/api/delete/${this.selectedChat.id}`, {
@@ -335,8 +431,9 @@ function cleanerApp() {
         if (res.ok) {
           const result = await res.json();
           const modeStr = result.dry_run ? 'Dry Run Simulation' : 'Live Deletion';
-          this.showToast(`${modeStr} finished: ${result.deleted_count} messages processed. Verified backup created.`, 'success', 5000);
+          this.showToast(`${modeStr} finished: ${result.deleted_count} messages processed. Verified backup recorded.`, 'success', 5000);
           this.showDeleteModal = false;
+          this.confirmDeleteAcknowledge = false;
           await this.loadChatDetails(this.selectedChat.id);
           await this.loadBackups();
         } else {
@@ -367,6 +464,7 @@ function cleanerApp() {
           const data = await res.json();
           this.showToast(`Imported archive: "${data.title}" (${data.imported_count} messages)`, 'success');
           this.showImportModal = false;
+          this.showOnboardingGuide = false;
           await this.loadChats();
         } else {
           const err = await res.json();
@@ -463,5 +561,36 @@ function cleanerApp() {
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
+
+    // Visual Caption Diff Helper: highlights added words vs reference
+    renderCaptionDiff(keepText, candidateText) {
+      if (!keepText && !candidateText) return '<span class="text-slate-500 italic">[No caption]</span>';
+      if (!keepText) return `<span class="bg-rose-950/40 text-rose-300 px-1 rounded">${this.escapeHtml(candidateText)}</span>`;
+      if (!candidateText) return '<span class="text-slate-500 italic">[No caption]</span>';
+
+      const keepWords = keepText.split(/\s+/);
+      const candWords = candidateText.split(/\s+/);
+
+      // Simple set comparison for altered wording
+      const keepSet = new Set(keepWords);
+      const result = candWords.map(word => {
+        if (!keepSet.has(word)) {
+          return `<span class="bg-amber-950/60 text-amber-300 font-semibold px-0.5 rounded border border-amber-800/40">${this.escapeHtml(word)}</span>`;
+        }
+        return this.escapeHtml(word);
+      }).join(' ');
+
+      return result;
+    },
+
+    escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
   };
 }
