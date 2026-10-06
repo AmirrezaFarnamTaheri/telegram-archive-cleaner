@@ -1,100 +1,80 @@
-# DESIGN.md: Telegram Archive Cleaner
+# DESIGN.md: Telegram Archive Cleaner Data Cockpit
 
-## Context (from discovery)
+## Strategy & Editorial Positioning
 
-- **Artifact type**: Dashboard / Data Forensic Tool (Mode: `Operate`)
-- **Positioning**: Technical, Utilitarian, Forensic
-- **Audience**: Power Telegram users, channel administrators, and digital archivists.
-- **Primary action**: Run audit, inspect duplicates with perceptual certainty, and execute safe deletions with verified SHA-256 rollback backups.
-- **Brand Adjectives**: Surgical, Trustworthy, Uncluttered, Fast, Cryptographically-Safe.
-- **Visual Word Translations**:
-  - *Surgical*: 1px hairline borders, monospaced tabular data, tight functional spacing, zero ornamental flairs.
-  - *Trustworthy*: Prominent SHA-256 checksum displays, non-destructive dry-run defaults, explicit safety alerts.
-  - *Uncluttered*: Cockpit telemetry strip, categorized filter pills, side-by-side diffing cards, strictly zero emojis.
-  - *Fast*: Buildless client runtime, sub-150ms state transitions, keyboard shortcuts (Esc to close modals).
-  - *Cryptographically-Safe*: Explicit hash verification badges, persistent backup history table with one-click offsite cloud export.
-- **Aesthetic Essence (3 words)**: Precision Archive Forensic.
-- **Single-minded Proposition**: Complete clarity and cryptographic safety in Telegram archive curation.
-- **Mode**: Dark (Cockpit / OLED-friendly).
-- **Density**: Dense (Cockpit mode with high scanability and tabular numerals).
-- **Constraints**: Pure HTML5/Tailwind/Alpine.js delivered directly by FastAPI. Zero Node.js build pipeline.
+- **Artifact Type**: Forensic Data Cockpit & Archive Curation Suite (Mode: Operate)
+- **Positioning**: High-precision forensic tool with cryptographic safety for power users, archivists, and community managers.
+- **Brand Adjectives**: Tactical, Forensic, Cryptographic, Uncompromising, Tactile.
+- **Aesthetic Essence**: Hardened Forensic Instrument.
+- **Audience**: Technical Telegram operators who need to audit dense message histories, remove duplicate media, verify dead links, and preserve restorable snapshots before deletion.
+- **Primary Action**: Ingest archive, run multi-engine audit, inspect duplicate differences, and execute safe deletions with verified SHA-256 backup archives.
 
-## Aesthetic
+## Editorial Quality & Anti-Slop Writing Standard
 
-- **Direction**: Precision Dark Technical Cockpit.
-- **Defining Trait**: High-density telemetry combined with 1px hairline structural frames and monospaced cryptographic identifiers.
-- **Signature Move**: Side-by-side visual duplicate cards with live media thumbnails, character-level diff highlighting, and instant retention policy toggles (Keep Newest, Keep Longest, Whitelist).
+In accordance with `/anti-slop-editorial-quality`, `/humanize`, and `/human-prose`:
+- **Zero AI Clichés**: Prohibited words include "delve", "testament", "tapestry", "seamless", "robust", "crucial", "empower", "unlock", "harness", "elevate", "game-changer", "meticulous", "interplay".
+- **Zero Marketing Fluff**: Avoid generic superlatives ("Experience the best", "Effortlessly clean"). State concrete mechanisms, byte sizes, exact hash algorithms, status codes, and trade-offs.
+- **Zero Structural Staccato**: Informative sentences with natural cadence, direct verbs, and active syntax.
+- **Zero Punctuation Tells**: Strictly zero em-dashes and zero en-dashes. Hyphens are used exclusively for compound technical terms (e.g., "dry-run", "pre-deletion").
+- **Zero Emojis**: Replaced completely with semantic SVG icons (Lucide / Phosphor technical iconography).
 
-## Typography
+## Typography System
 
-- **Display & Body**: `Plus Jakarta Sans` | Source: Google Fonts | License: OFL
-  - High geometric clarity, optical legibility at 11px-14px micro-sizes, wide aperture.
-- **Monospace & Numerical**: `JetBrains Mono` | Source: Google Fonts | License: Apache 2.0
-  - Tabular numerals (`font-variant-numeric: tabular-nums`), message IDs, SHA-256 checksums, byte calculations.
-- **Type Scale** (Base: 14px, Ratio: 1.2 Minor Third):
-  - Hero/Header: 20px (weight 700, tracking -0.02em)
-  - Section Title: 16px (weight 600, tracking -0.01em)
-  - Card/Body: 14px (weight 400/500, line-height 1.5)
-  - Caption/Meta: 12px (weight 400/500, line-height 1.4)
-  - Micro-telemetry: 11px (weight 600, uppercase, tracking 0.05em)
-- **Tracking & Measure**:
-  - Display tracking: `-0.02em` to `-0.03em`.
-  - Content measure: Max `70ch` per caption block.
+- **Display & Interface Body**: `Plus Jakarta Sans` (Google Fonts / Offline system fallback)
+  - Clear geometric forms, optical open counters, high legibility at micro-sizes.
+- **Monospace & Numerical Engine**: `JetBrains Mono` (Google Fonts / Offline system fallback)
+  - Used for all message identifiers, SHA-256 digests, MIME types, file sizes, and status codes.
+  - Tabular numerals enabled via `tabular-nums` for rock-solid grid alignment.
+- **Scale (Minor Third, 1.200)**:
+  - Header / App Title: 18px (Font weight: 700, tracking: -0.02em)
+  - Section Headings: 15px (Font weight: 600, tracking: -0.01em)
+  - Primary UI & Body: 13px (Font weight: 500, line-height: 1.5)
+  - Secondary Meta: 12px (Font weight: 400, line-height: 1.4)
+  - Micro-telemetry: 11px (Font weight: 600, font-mono, tracking: 0.04em, uppercase)
 
-## Color System
+## Color Palette (High-Contrast Obsidian & Technical Signal)
 
-- **Strategy**: Deep slate canvas with high-contrast signal accents. Replaces the statistical median "AI purple gradient" with an industrial palette of Obsidian (`#090d16`), Slate (`#0f172a`), Cyan (`#0284c7`), Emerald (`#10b981`), Amber (`#f59e0b`), and Rose (`#f43f5e`).
-- **Distribution**: 65% Neutral Surface / 25% Slate Frame / 10% Functional Signal.
-- **Palette Tokens**:
-  - Canvas / Background: `#090d16` (deep dark slate)
-  - Surface Elevation 1: `#0f172a` (slate-900)
-  - Surface Elevation 2 (Card/Container): `#131d31` (slate-900/80)
-  - Border Hairline: `#1e293b` (slate-800)
-  - Border Subtle: `#334155` (slate-700)
-  - Text Primary: `#f8fafc` (slate-50)
-  - Text Secondary: `#94a3b8` (slate-400)
-  - Text Muted: `#64748b` (slate-500)
-  - Brand Primary / Focus Accent: `#0ea5e9` (sky-500) / `#0284c7` (sky-600)
-  - Success / Preserved: `#10b981` (emerald-500) / `#064e3b` (surface)
-  - Warning / Policy / Duplicate: `#f59e0b` (amber-500) / `#78350f` (surface)
-  - Danger / Deletion Target: `#f43f5e` (rose-500) / `#881337` (surface)
+- **Canvas / Background**: `#090d16` (deep dark technical obsidian)
+- **Surface Panels**: `#0f172a` (slate 900)
+- **Elevated Cards & Containers**: `#131d31` (slate 900 with 4% blue-tint elevation)
+- **Hairline Structural Borders**: `#1e293b` (slate 800, 1px)
+- **Strong Borders & Dividers**: `#334155` (slate 700)
+- **Primary Text**: `#f8fafc` (slate 50, crisp contrast)
+- **Secondary Text**: `#94a3b8` (slate 400)
+- **Muted Text & Placeholders**: `#64748b` (slate 500)
+- **Signal Accents**:
+  - Technical Sky (`#0284c7` / `#0ea5e9`): Primary actions, focus rings, active tabs.
+  - Tactical Emerald (`#10b981` / `#064e3b`): Verified cryptographic backups, safe items, online status.
+  - Signal Amber (`#f59e0b` / `#78350f`): Visual diff variations, broken links, warning thresholds.
+  - Alert Rose (`#f43f5e` / `#881337`): Staged deletions, policy restrictions, critical warnings.
 
-## Spacing, Radius, Shadow
+## Layout & Component Architecture
 
-- **Base Unit**: 4px (spacing scale: 4, 8, 12, 16, 20, 24, 32px).
-- **Radius**: Max two levels: `6px` (`rounded-md`) for controls and badges; `10px` (`rounded-lg`) for panels and modal windows. No generic 24px+ blob rounding.
-- **Shadow & Depth**: 1px structural borders are the primary elevation mechanism. Soft elevation shadow (`shadow-2xl shadow-black/80`) is reserved strictly for modal viewports and toast notifications.
+1. **Top Cockpit Rail**:
+   - Technical title badge with offline standalone detection.
+   - Command Palette quick-launcher (`Ctrl+K`).
+   - Telemetry status indicators: SQLite database health, MTProto link, Edge Relay proxy.
+   - Global workspace actions: Import Desktop JSON, Quick Keyboard Guide (`?`), Sync Refresh.
+2. **Left Navigation Sidebar (Collapsible Drawer on Mobile)**:
+   - Archive source selector with message counts, storage usage, and last scan timestamps.
+   - Quick Demo Sandbox trigger for offline testing.
+3. **Central Forensic Workspace**:
+   - Target archive metadata banner with quick audit action and staged deletion counter.
+   - High-density KPI ribbon (Messages, Exact Dupes, Visual Variations, Dead Links, Restrictions, Reclaimable Bytes).
+   - Multi-view tab controller:
+     - **Flagged Queue**: Categorized candidate messages, batch selection, keyword filtering, inline rationale.
+     - **Diff Studio**: Dual-pane comparative card deck showing identical media with altered captions and retention selectors.
+     - **Backup Ledger**: List of cryptographically verified JSON snapshots with SHA-256 hash copying and cloud export.
+     - **Forensic Inspector**: Deep JSON inspection of headers, perceptual hashes, and validation traces.
+4. **Command Palette (`Ctrl+K`)**:
+   - Instant search and keyboard execution of common operations.
+5. **Non-Blocking Notification Queue**:
+   - Floating toast stack in the lower right for transient success, warning, and error messages.
 
-## Layout and Composition
+## Self-Audit Verification
 
-- **Global Framework**: Fixed sticky top cockpit bar (header) + 2-column layout (72-width chat navigation sidebar + full-width fluid analytical workspace).
-- **Telemetry Bar**: 7-point dense KPI ribbon displaying Total Messages, Exact Dupes, Same Media Diff, Dead Links, Policy Flags, Deletion Candidates, and Reclaimable Bytes in tabular monospace numbers.
-- **Candidate Filter Ribbon**: Quick filter chips (`All`, `Exact Dupes`, `Same Media`, `Dead Links`, `Policy`) + instantaneous keyword search bar.
-- **Responsive Handling**: Mobile and small displays collapse the sidebar into an accessible drawer toggle with `overflow-x-auto` wrappers for data tables.
-
-## Components and States
-
-- **Buttons**:
-  - Primary (Filled): High contrast sky/rose/emerald with `:active:scale-[0.98]` tactile depression and smooth hover transitions.
-  - Secondary (Framed): Slate border with subtle light wash on hover.
-  - Focus Ring: `focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:outline-none`.
-- **Inputs**: Explicit text label above input, dark mono styling for tokens/phone, keyboard Enter submission handler.
-- **Modals**: ESC-to-close handler, click-backdrop-to-dismiss, backdrop blur, trapped focus, smooth opacity fade.
-- **Toast Notifications**: Replaces intrusive browser `alert()` popups with a floating non-blocking notification queue in the lower-right corner (auto-dismissing with manual close action).
-- **Zero-Emoji Discipline**: Emojis are strictly banned. Replaced by semantic SVG icons from Lucide/Phosphor style definitions (Lightning, Shield, Cross, Arrow, Folder, Checkmark, Refresh).
-
-## Motion & Interaction
-
-- **Duration**: Fast (150ms-200ms) for buttons and tabs; 250ms for modal backdrops.
-- **Easing**: `cubic-bezier(0.16, 1, 0.3, 1)` (snappy ease-out).
-- **Reduced Motion**: Respects `@media (prefers-reduced-motion: reduce)` with instantaneous transitions.
-
-## Slop Self-Audit Checklist
-
-- [x] No generic AI fonts: `Plus Jakarta Sans` and `JetBrains Mono` imported and configured.
-- [x] No generic AI purple/violet gradients: Replaced with high-contrast Obsidian/Slate + precision Sky/Emerald/Rose cues.
-- [x] Zero emojis in code or user interface: 100% replaced with standardized SVG icons.
-- [x] No browser `alert()` dialogs: Replaced with an elegant in-app toast notification system.
-- [x] Full interactive state coverage: default, hover, active tactile scale, focus rings, disabled, and loading spinners.
-- [x] Tabular data alignment: All numeric counters, byte sizes, message IDs, and SHA-256 hashes render in monospace tabular numerals.
-- [x] Accessibility: Keyboard operability, explicit form labels, contrast ratio exceeding WCAG 2.2 AA (4.5:1 minimum).
+- [x] Zero emojis across all UI copy and code comments.
+- [x] Zero em-dashes and zero en-dashes.
+- [x] Full offline capability with standalone demo sandbox fallback.
+- [x] Clean typographic hierarchy with monospace numbers.
+- [x] Full interactive state coverage (hover, focus-visible ring, active scale, disabled).
