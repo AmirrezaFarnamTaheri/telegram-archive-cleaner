@@ -1,19 +1,17 @@
 /**
  * Alpine.js application controller for Telegram Archive Cleaner
- * Clean Architecture, responsive, zero-slop architecture.
- * Features:
- * - Client-side pagination and fast search filtering
- * - Visual diff studio with retention preset assignment
- * - Cryptographic SHA-256 pre-deletion verification and cloud export
- * - MTProto API credentials and network proxy configuration
- * - Seamless fallback to standalone demo sandbox when backend daemon is offline
- * - Strictly zero emojis and zero em-dashes
+ * Browser UI controller.
+ * - Side-by-side caption comparison and retention choices
+ * Handles backup verification and optional cloud upload.
+ * Handles Telegram login and proxy settings.
+ * - Demo data when the local service is unavailable
  */
 
 function cleanerApp() {
   return {
     dbHealthy: false,
     isOfflineMode: false,
+    apiAuthRequired: false,
     chats: [],
     selectedChat: null,
     stats: null,
@@ -29,12 +27,14 @@ function cleanerApp() {
     uploading: false,
     dryRunMode: true,
     confirmDeleteAcknowledge: false,
+    deleteConfirmationText: '',
+    apiToken: '',
 
-    // Pagination for candidate queue
+    // Review pagination
     page: 1,
     pageSize: 25,
 
-    // Layout and UI shell
+    // Layout
     sidebarOpen: typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
     isMobile: typeof window !== 'undefined' ? window.innerWidth < 768 : false,
     showShortcutsModal: false,
@@ -42,7 +42,7 @@ function cleanerApp() {
     showCommandPalette: false,
     commandQuery: '',
 
-    // Raw payload and media inspectors
+    // Message data and media preview
     showRawInspectorModal: false,
     inspectedMessage: null,
     showMediaModal: false,
@@ -56,7 +56,7 @@ function cleanerApp() {
     showAuthModal: false,
     showCloudExportModal: false,
 
-    // MTProto authentication state
+    // Telegram login
     telegramAuth: false,
     authStep: 'phone',
     authPhone: '',
@@ -76,11 +76,11 @@ function cleanerApp() {
     showCredentialsSection: false,
     showProxySection: false,
 
-    // Edge relay telemetry
+    // Relay status
     relayConfigured: false,
-    relayProvider: 'Direct Local',
+    relayProvider: 'Direct',
 
-    // Cloud export state
+    // Backup upload
     exportTargetBackup: null,
     cloudProvider: 'github',
     cloudToken: '',
@@ -88,33 +88,38 @@ function cleanerApp() {
     cloudFolderId: '',
     cloudExporting: false,
 
-    // Toast notifications stack
+    // Notifications
     toasts: [],
     toastCounter: 0,
 
-    // Global command palette entries
+    // Command menu
     commandList: [
-      { id: 'cmd_demo', title: 'Load Demonstration Archive', category: 'Testing', action: 'load_demo' },
-      { id: 'cmd_scan', title: 'Run Forensic Audit', category: 'Audit', action: 'run_scan' },
-      { id: 'cmd_tab_cand', title: 'Switch to Flagged Candidates', category: 'Navigation', action: 'tab_candidates' },
-      { id: 'cmd_tab_diff', title: 'Switch to Visual Diff Studio', category: 'Navigation', action: 'tab_diffs' },
-      { id: 'cmd_tab_backups', title: 'Switch to Backup Ledger', category: 'Navigation', action: 'tab_backups' },
-      { id: 'cmd_tab_auth', title: 'Switch to MTProto Connection', category: 'Navigation', action: 'tab_auth' },
-      { id: 'cmd_select_all', title: 'Select All Filtered Candidates', category: 'Selection', action: 'select_all' },
-      { id: 'cmd_deselect_all', title: 'Deselect All Candidates', category: 'Selection', action: 'deselect_all' },
-      { id: 'cmd_filter_exact', title: 'Filter: Exact SHA-256 Duplicates', category: 'Filter', action: 'filter_exact' },
-      { id: 'cmd_filter_diff', title: 'Filter: Visual Media Variations', category: 'Filter', action: 'filter_diff' },
-      { id: 'cmd_filter_link', title: 'Filter: Dead Hyperlinks', category: 'Filter', action: 'filter_link' },
-      { id: 'cmd_filter_policy', title: 'Filter: Platform Terms Restrictions', category: 'Filter', action: 'filter_policy' },
-      { id: 'cmd_import', title: 'Import Telegram Desktop JSON', category: 'Ingest', action: 'import_json' },
-      { id: 'cmd_auth', title: 'Configure Telegram MTProto Login', category: 'Ingest', action: 'open_auth' },
-      { id: 'cmd_delete', title: 'Open Safe Deletion Dialog', category: 'Execution', action: 'open_delete' },
-      { id: 'cmd_toggle_dry', title: 'Toggle Dry-Run Simulation Mode', category: 'Safety', action: 'toggle_dry' },
+      { id: 'cmd_demo', title: 'Load Demo Archive', category: 'Testing', action: 'load_demo' },
+      { id: 'cmd_scan', title: 'Run Analysis', category: 'Analysis', action: 'run_scan' },
+      { id: 'cmd_tab_cand', title: 'Open Review', category: 'Navigation', action: 'tab_candidates' },
+      { id: 'cmd_tab_diff', title: 'Open Compare View', category: 'Navigation', action: 'tab_diffs' },
+      { id: 'cmd_tab_backups', title: 'Open Backups', category: 'Navigation', action: 'tab_backups' },
+      { id: 'cmd_tab_auth', title: 'Open Connection Settings', category: 'Navigation', action: 'tab_auth' },
+      { id: 'cmd_select_all', title: 'Stage All Ready Items', category: 'Selection', action: 'select_all' },
+      { id: 'cmd_deselect_all', title: 'Clear Staged Items', category: 'Selection', action: 'deselect_all' },
+      { id: 'cmd_filter_exact', title: 'Show Exact Duplicates', category: 'Filter', action: 'filter_exact' },
+      { id: 'cmd_filter_diff', title: 'Show Media Variants', category: 'Filter', action: 'filter_diff' },
+      { id: 'cmd_filter_link', title: 'Show Dead Links', category: 'Filter', action: 'filter_link' },
+      { id: 'cmd_filter_policy', title: 'Show Telegram Restrictions', category: 'Filter', action: 'filter_policy' },
+      { id: 'cmd_import', title: 'Import Telegram Desktop JSON', category: 'Import', action: 'import_json' },
+      { id: 'cmd_auth', title: 'Set Up Telegram Login', category: 'Import', action: 'open_auth' },
+      { id: 'cmd_delete', title: 'Review Deletion', category: 'Cleanup', action: 'open_delete' },
+      { id: 'cmd_toggle_dry', title: 'Toggle Simulation', category: 'Cleanup', action: 'toggle_dry' },
       { id: 'cmd_toggle_sidebar', title: 'Toggle Source Sidebar', category: 'View', action: 'toggle_sidebar' },
-      { id: 'cmd_shortcuts', title: 'View Keyboard Navigation Shortcuts', category: 'Help', action: 'open_shortcuts' }
+      { id: 'cmd_shortcuts', title: 'Show Keyboard Shortcuts', category: 'Help', action: 'open_shortcuts' }
     ],
 
     async init() {
+      try {
+        this.apiToken = window.localStorage.getItem('tg_cleaner_api_token') || '';
+      } catch {
+        this.apiToken = '';
+      }
       this.isMobile = window.innerWidth < 768;
       this.sidebarOpen = !this.isMobile;
       window.addEventListener('resize', () => {
@@ -140,8 +145,13 @@ function cleanerApp() {
           await this.checkRelayStatus();
           await this.loadChats();
           await this.loadBackups();
+        } else if (this.apiAuthRequired) {
+          this.isOfflineMode = false;
+          this.chats = [];
+          this.selectedChat = null;
+          this.stats = null;
         } else {
-          // Graceful fallback to interactive demo sandbox
+          // Use demo data when the local service is unavailable.
           this.isOfflineMode = true;
           this.loadDemoMockData();
         }
@@ -209,6 +219,162 @@ function cleanerApp() {
       this.showCommandPalette = false;
       this.showRawInspectorModal = false;
       this.confirmDeleteAcknowledge = false;
+      this.deleteConfirmationText = '';
+    },
+
+    async apiFetch(input, init = {}) {
+      const options = { ...init };
+      const headers = new Headers(options.headers || {});
+      if (this.apiToken) {
+        headers.set('Authorization', `Bearer ${this.apiToken}`);
+      }
+      options.headers = headers;
+      return window.fetch(input, options);
+    },
+
+    saveApiToken() {
+      if (typeof window === 'undefined') return;
+      const token = (this.apiToken || '').trim();
+      this.apiToken = token;
+      try {
+        if (token) {
+          window.localStorage.setItem('tg_cleaner_api_token', token);
+          this.showToast('Dashboard API token saved locally in this browser', 'success');
+        } else {
+          window.localStorage.removeItem('tg_cleaner_api_token');
+          this.showToast('Dashboard API token cleared', 'info');
+        }
+      } catch {
+        this.showToast('Browser storage is unavailable; using the API token for this page only', 'warning');
+      }
+      this.refreshAll();
+    },
+
+    statValue(name) {
+      if (!this.stats) return 0;
+      const aliases = {
+        same_media_diff_caption: ['same_media_diff_caption', 'diff_duplicates'],
+        policy_restricted: ['policy_restricted', 'policy_flags'],
+        estimated_reclaimable_bytes: ['estimated_reclaimable_bytes', 'total_reclaimable_bytes'],
+        total_deletion_candidates: ['total_deletion_candidates'],
+      };
+      for (const key of aliases[name] || [name]) {
+        if (this.stats[key] !== undefined && this.stats[key] !== null) return this.stats[key];
+      }
+      if (name === 'total_deletion_candidates') return this.candidates.length;
+      return 0;
+    },
+
+    candidateHasCategory(candidate, category) {
+      const types = Array.isArray(candidate.flag_types) && candidate.flag_types.length
+        ? candidate.flag_types
+        : [candidate.flag_type];
+      const normalized = types.filter(Boolean).map(type => String(type).toUpperCase());
+      const groups = {
+        exact: ['DUPLICATE_EXACT_TEXT', 'DUPLICATE_EXACT_MEDIA', 'DUPLICATE_FUZZY_TEXT', 'DUPLICATE_FORWARD', 'EXACT_DUPLICATE'],
+        diff: ['DUPLICATE_SAME_MEDIA_DIFF_CAPTION', 'DIFF_DUPLICATE'],
+        link: ['STALE_DEAD_LINK', 'STALE_EXPIRED_INVITE', 'DEAD_LINK'],
+        policy: ['POLICY_RESTRICTED', 'POLICY_EMPTY_MEDIA', 'POLICY_DELETED_ACCOUNT', 'POLICY_VIOLATION'],
+      };
+      return (groups[category] || []).some(type => normalized.includes(type));
+    },
+
+    candidateLabel(candidate) {
+      if (this.candidateHasCategory(candidate, 'diff')) return 'Changed copy';
+      if (this.candidateHasCategory(candidate, 'exact')) return 'Duplicate';
+      if (this.candidateHasCategory(candidate, 'link')) return 'Dead link';
+      if (this.candidateHasCategory(candidate, 'policy')) return 'Telegram issue';
+      return 'Review';
+    },
+
+    candidateTone(candidate) {
+      if (this.candidateHasCategory(candidate, 'link')) return 'amber';
+      if (this.candidateHasCategory(candidate, 'policy')) return 'rose';
+      if (this.candidateHasCategory(candidate, 'diff')) return 'violet';
+      return 'sky';
+    },
+
+    candidateEligible(candidate) {
+      return candidate && candidate.recommended_for_deletion !== false;
+    },
+
+    candidateStatusLabel(candidate) {
+      return this.candidateEligible(candidate) ? 'Ready to stage' : 'Needs approval';
+    },
+
+    candidateScore(candidate) {
+      const value = Number(candidate?.confidence ?? 0);
+      return `${Math.max(0, Math.min(100, Math.round(value * 100)))}%`;
+    },
+
+    readyCount() {
+      return this.candidates.filter(candidate => this.candidateEligible(candidate)).length;
+    },
+
+    reviewOnlyCount() {
+      return this.candidates.filter(candidate => !this.candidateEligible(candidate)).length;
+    },
+
+    categoryCount(category) {
+      return this.candidates.filter(candidate => this.candidateHasCategory(candidate, category)).length;
+    },
+
+    readyFilteredCandidates() {
+      return this.filteredCandidates().filter(candidate => this.candidateEligible(candidate));
+    },
+
+    stageCandidate(candidate) {
+      if (!this.candidateEligible(candidate)) {
+        this.showToast('Approve this item before staging it', 'warning');
+        return;
+      }
+      if (!this.selectedCandidateIds.includes(candidate.id)) {
+        this.selectedCandidateIds = [...this.selectedCandidateIds, candidate.id];
+      }
+    },
+
+    unstageCandidate(candidate) {
+      this.selectedCandidateIds = this.selectedCandidateIds.filter(id => id !== candidate.id);
+    },
+
+    async setResultApproval(candidate, eligible) {
+      if (!candidate || !this.selectedChat) return;
+      if (eligible === false) {
+        this.unstageCandidate(candidate);
+      }
+
+      if (this.isOfflineMode) {
+        candidate.recommended_for_deletion = eligible;
+        this.showToast(eligible ? 'Result approved for staging in demo mode' : 'Result now requires approval in demo mode', eligible ? 'success' : 'info');
+        return;
+      }
+
+      try {
+        const res = await this.apiFetch(`/api/chats/${this.selectedChat.id}/findings/${candidate.id}/eligibility`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eligible }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || 'Approval update failed');
+        }
+        candidate.recommended_for_deletion = eligible;
+        this.showToast(eligible ? 'Result approved for staging' : 'Result now requires approval', eligible ? 'success' : 'info');
+      } catch (err) {
+        this.showToast(`Could not update approval: ${err.message}`, 'error');
+      }
+    },
+
+    openDeleteReview(preferLive = false) {
+      if (this.selectedCandidateIds.length === 0) {
+        this.showToast('Stage at least one message before continuing', 'warning');
+        return;
+      }
+      this.dryRunMode = !preferLive;
+      this.confirmDeleteAcknowledge = false;
+      this.deleteConfirmationText = '';
+      this.showDeleteModal = true;
     },
 
     filteredCommands() {
@@ -267,14 +433,10 @@ function cleanerApp() {
           this.showImportModal = true;
           break;
         case 'open_auth':
-          this.showAuthModal = true;
+          this.activeTab = 'auth';
           break;
         case 'open_delete':
-          if (this.selectedCandidateIds.length > 0) {
-            this.showDeleteModal = true;
-          } else {
-            this.showToast('No messages currently staged for deletion', 'warning');
-          }
+          this.openDeleteReview(false);
           break;
         case 'toggle_dry':
           this.dryRunMode = !this.dryRunMode;
@@ -308,11 +470,11 @@ function cleanerApp() {
     async checkRelayStatus() {
       if (this.isOfflineMode) return;
       try {
-        const res = await fetch('/api/relay/status');
+        const res = await this.apiFetch('/api/relay/status');
         if (res.ok) {
           const data = await res.json();
           this.relayConfigured = data.configured === true;
-          this.relayProvider = data.provider || 'Direct Local';
+          this.relayProvider = data.provider || 'Direct';
         }
       } catch {
         this.relayConfigured = false;
@@ -322,7 +484,7 @@ function cleanerApp() {
     async checkAuthStatus() {
       if (this.isOfflineMode) return;
       try {
-        const res = await fetch('/api/auth/status');
+        const res = await this.apiFetch('/api/auth/status');
         if (res.ok) {
           const data = await res.json();
           this.telegramAuth = data.authenticated === true;
@@ -350,7 +512,7 @@ function cleanerApp() {
       }
       if (this.isOfflineMode) {
         this.hasApiCredentials = true;
-        this.showToast('API credentials saved in sandbox session', 'success');
+        this.showToast('API credentials saved for this demo session', 'success');
         return;
       }
 
@@ -368,7 +530,7 @@ function cleanerApp() {
           if (this.authProxyPass) payload.proxy_password = this.authProxyPass;
           if (this.authProxySecret) payload.proxy_secret = this.authProxySecret.trim();
         }
-        const res = await fetch('/api/auth/credentials', {
+        const res = await this.apiFetch('/api/auth/credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -421,7 +583,7 @@ function cleanerApp() {
           if (this.authProxyPass) payload.proxy_password = this.authProxyPass;
           if (this.authProxySecret) payload.proxy_secret = this.authProxySecret.trim();
         }
-        const res = await fetch('/api/auth/send-code', {
+        const res = await this.apiFetch('/api/auth/send-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -459,7 +621,7 @@ function cleanerApp() {
       }
       this.authLoading = true;
       try {
-        const res = await fetch('/api/auth/sign-in', {
+        const res = await this.apiFetch('/api/auth/sign-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -497,10 +659,15 @@ function cleanerApp() {
       }
       this.authLoading = true;
       try {
-        const res = await fetch('/api/auth/2fa', {
+        const res = await this.apiFetch('/api/auth/sign-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: this.authPassword }),
+          body: JSON.stringify({
+            phone: this.authPhone.trim(),
+            code: this.authCode.trim(),
+            phone_code_hash: this.phoneCodeHash,
+            password: this.authPassword,
+          }),
         });
         const data = await res.json();
         if (res.ok && data.status === 'ok') {
@@ -522,10 +689,18 @@ function cleanerApp() {
       if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
         this.dbHealthy = false;
         this.isOfflineMode = true;
+        this.apiAuthRequired = false;
         return;
       }
       try {
-        const res = await fetch('/api/health');
+        const res = await this.apiFetch('/api/health');
+        if (res.status === 401) {
+          this.dbHealthy = false;
+          this.isOfflineMode = false;
+          this.apiAuthRequired = true;
+          return;
+        }
+        this.apiAuthRequired = false;
         if (res.ok) {
           const data = await res.json();
           this.dbHealthy = data.db_healthy === true;
@@ -537,13 +712,14 @@ function cleanerApp() {
       } catch {
         this.dbHealthy = false;
         this.isOfflineMode = true;
+        this.apiAuthRequired = false;
       }
     },
 
     async loadChats() {
       if (this.isOfflineMode) return;
       try {
-        const res = await fetch('/api/chats');
+        const res = await this.apiFetch('/api/chats');
         if (res.ok) {
           this.chats = await res.json();
           if (this.chats.length > 0 && !this.selectedChat) {
@@ -590,15 +766,17 @@ function cleanerApp() {
     async loadChatDetails(chatId) {
       if (this.isOfflineMode) return;
       try {
-        const statsRes = await fetch(`/api/chats/${chatId}/stats`);
+        const statsRes = await this.apiFetch(`/api/chats/${chatId}/stats`);
         if (statsRes.ok) {
           this.stats = await statsRes.json();
         }
 
-        const candsRes = await fetch(`/api/chats/${chatId}/candidates`);
+        const candsRes = await this.apiFetch(`/api/chats/${chatId}/findings`);
         if (candsRes.ok) {
           this.candidates = await candsRes.json();
-          this.selectedCandidateIds = this.candidates.map(c => c.id);
+          this.selectedCandidateIds = [];
+          this.deleteConfirmationText = '';
+          this.confirmDeleteAcknowledge = false;
         }
 
         await this.loadDiffGroups(chatId);
@@ -613,42 +791,28 @@ function cleanerApp() {
       if (this.isOfflineMode) return;
       this.diffGroups = [];
       try {
-        const flagsRes = await fetch(`/api/chats/${chatId}/candidates`);
-        if (flagsRes.ok) {
-          const msgs = await flagsRes.json();
-          const groupMap = {};
-          for (const m of msgs) {
-            if (m.media_id) {
-              if (!groupMap[m.media_id]) groupMap[m.media_id] = [];
-              groupMap[m.media_id].push(m);
-            }
-          }
-          for (const [key, groupMsgs] of Object.entries(groupMap)) {
-            if (groupMsgs.length > 1) {
-              this.diffGroups.push({
-                group_id: `grp_${key.substring(0, 8)}`,
-                messages: groupMsgs,
-                suggested_keep_id: groupMsgs[groupMsgs.length - 1].id,
-              });
-            }
-          }
+        const res = await this.apiFetch(`/api/chats/${chatId}/duplicate-groups`);
+        if (res.ok) {
+          const groups = await res.json();
+          this.diffGroups = groups.filter(group =>
+            group.group_type === 'SAME_MEDIA_DIFF_CAPTION' ||
+            group.group_type === 'FUZZY_TEXT' ||
+            group.group_type === 'EXACT_MEDIA' ||
+            group.group_type === 'EXACT_TEXT'
+          );
         }
-      } catch {
-        // Silently preserve stability
+      } catch (err) {
+        if (this.dbHealthy) {
+          this.showToast(`Failed loading duplicate groups: ${err.message}`, 'error');
+        }
       }
     },
 
     filteredCandidates() {
       let result = this.candidates;
 
-      if (this.candidateFilter === 'exact') {
-        result = result.filter(c => c.flag_type === 'exact_duplicate');
-      } else if (this.candidateFilter === 'diff') {
-        result = result.filter(c => c.flag_type === 'diff_duplicate');
-      } else if (this.candidateFilter === 'link') {
-        result = result.filter(c => c.flag_type === 'dead_link');
-      } else if (this.candidateFilter === 'policy') {
-        result = result.filter(c => c.flag_type === 'policy_violation');
+      if (['exact', 'diff', 'link', 'policy'].includes(this.candidateFilter)) {
+        result = result.filter(c => this.candidateHasCategory(c, this.candidateFilter));
       }
 
       if (this.searchQuery && this.searchQuery.trim() !== '') {
@@ -709,22 +873,22 @@ function cleanerApp() {
       if (this.isOfflineMode) {
         await new Promise(r => setTimeout(r, 600));
         this.scanning = false;
-        this.showToast(`Forensic audit completed: ${this.candidates.length} candidates identified (Sandbox)`, 'success');
+        this.showToast(`Analysis complete: ${this.candidates.length} results found (Demo)`, 'success');
         return;
       }
       try {
-        const res = await fetch(`/api/scan/${this.selectedChat.id}`, { method: 'POST' });
+        const res = await this.apiFetch(`/api/scan/${this.selectedChat.id}`, { method: 'POST' });
         if (res.ok) {
           const data = await res.json();
           this.stats = data.stats;
           await this.loadChatDetails(this.selectedChat.id);
-          this.showToast(`Forensic audit completed: ${this.candidates.length} candidate messages identified`, 'success');
+          this.showToast(`Analysis complete: ${this.candidates.length} results found`, 'success');
         } else {
           const err = await res.json();
-          this.showToast(`Audit failed: ${err.detail || 'Internal error'}`, 'error');
+          this.showToast(`Analysis failed: ${err.detail || 'Internal error'}`, 'error');
         }
       } catch (err) {
-        this.showToast(`Audit failed: ${err.message}`, 'error');
+        this.showToast(`Analysis failed: ${err.message}`, 'error');
       } finally {
         this.scanning = false;
       }
@@ -736,7 +900,7 @@ function cleanerApp() {
         return;
       }
       try {
-        const res = await fetch(`/api/groups/${groupId}/preset`, {
+        const res = await this.apiFetch(`/api/groups/${groupId}/preset`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ preset }),
@@ -750,17 +914,43 @@ function cleanerApp() {
       }
     },
 
-    openMediaInspect(chatId, msgId, title) {
-      this.inspectMediaUrl = `/api/media/${chatId}/${msgId}`;
-      this.inspectMediaTitle = title || `Message #${msgId} Media Payload`;
+    async openMediaInspect(chatId, msgId, title) {
+      if (this.inspectMediaUrl && this.inspectMediaUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(this.inspectMediaUrl);
+      }
+      this.inspectMediaUrl = '';
+      this.inspectMediaTitle = title || `Message #${msgId} media`;
       this.inspectMediaId = msgId;
       this.showMediaModal = true;
+      if (this.isOfflineMode) return;
+      try {
+        const res = await this.apiFetch(`/api/media/${chatId}/${msgId}`);
+        if (!res.ok) {
+          this.showToast('No local preview is available for this message', 'info');
+          return;
+        }
+        const blob = await res.blob();
+        this.inspectMediaUrl = URL.createObjectURL(blob);
+      } catch (err) {
+        this.showToast(`Media preview failed: ${err.message}`, 'error');
+      }
     },
 
     async executeBatchDelete() {
       if (!this.selectedChat || this.selectedCandidateIds.length === 0) return;
+      if (!this.dryRunMode && !this.telegramAuth && !this.isOfflineMode) {
+        this.activeTab = 'auth';
+        this.showDeleteModal = false;
+        this.showToast('Connect an authorized Telegram session before live deletion', 'warning');
+        return;
+      }
       if (!this.dryRunMode && !this.confirmDeleteAcknowledge) {
-        this.showToast('Acknowledge the pre-deletion backup confirmation before live deletion', 'warning');
+        this.showToast('Confirm the backup requirement before live deletion', 'warning');
+        return;
+      }
+      const expectedPhrase = `DELETE ${this.selectedCandidateIds.length}`;
+      if (!this.dryRunMode && this.deleteConfirmationText.trim() !== expectedPhrase) {
+        this.showToast(`Type ${expectedPhrase} to confirm this live deletion`, 'warning');
         return;
       }
 
@@ -782,6 +972,7 @@ function cleanerApp() {
         }
         this.showDeleteModal = false;
         this.confirmDeleteAcknowledge = false;
+        this.deleteConfirmationText = '';
         this.deleting = false;
         const modeStr = this.dryRunMode ? 'Dry-run simulation' : 'Live deletion';
         this.showToast(`${modeStr} finished: ${count} messages processed. Verified backup recorded.`, 'success', 5000);
@@ -789,7 +980,7 @@ function cleanerApp() {
       }
 
       try {
-        const res = await fetch(`/api/delete/${this.selectedChat.id}`, {
+        const res = await this.apiFetch(`/api/delete/${this.selectedChat.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -804,6 +995,7 @@ function cleanerApp() {
           this.showToast(`${modeStr} finished: ${result.deleted_count} messages processed. Backup verified.`, 'success', 5000);
           this.showDeleteModal = false;
           this.confirmDeleteAcknowledge = false;
+          this.deleteConfirmationText = '';
           await this.loadChatDetails(this.selectedChat.id);
           await this.loadBackups();
         } else {
@@ -836,7 +1028,7 @@ function cleanerApp() {
           this.chats.unshift(newChat);
           await this.selectChat(newChat);
           this.showImportModal = false;
-          this.showToast(`Imported ${newChat.total_messages} messages from ${file.name} (Client Sandbox)`, 'success');
+          this.showToast(`Imported ${newChat.total_messages} messages from ${file.name} (Demo)`, 'success');
         } catch (e) {
           this.showToast(`Invalid JSON file format: ${e.message}`, 'error');
         }
@@ -847,7 +1039,7 @@ function cleanerApp() {
       formData.append('file', file);
       this.uploading = true;
       try {
-        const res = await fetch('/api/chats/import-desktop', {
+        const res = await this.apiFetch('/api/chats/import-desktop', {
           method: 'POST',
           body: formData,
         });
@@ -870,7 +1062,7 @@ function cleanerApp() {
     async loadBackups() {
       if (this.isOfflineMode) return;
       try {
-        const res = await fetch('/api/backups');
+        const res = await this.apiFetch('/api/backups');
         if (res.ok) {
           this.backups = await res.json();
         }
@@ -879,22 +1071,49 @@ function cleanerApp() {
       }
     },
 
-    async verifyBackupChecksum(backup) {
+    async downloadBackup(backup) {
+      if (!backup) return;
       if (this.isOfflineMode) {
-        this.showToast(`Integrity confirmed for ${backup.filename}: SHA-256 matches payload (Sandbox)`, 'success');
+        this.showToast('Backup download is available when the local service is running', 'info');
         return;
       }
       try {
-        const res = await fetch(`/api/backups/${encodeURIComponent(backup.filename)}/verify`);
+        const res = await this.apiFetch(`/api/backups/download/${encodeURIComponent(backup.filename)}`);
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          this.showToast(`Backup download failed: ${detail.detail || 'file unavailable'}`, 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = backup.filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        this.showToast(`Backup download failed: ${err.message}`, 'error');
+      }
+    },
+
+    async verifyBackupChecksum(backup) {
+      if (this.isOfflineMode) {
+        this.showToast(`Backup verified for ${backup.filename} (Demo)`, 'success');
+        return;
+      }
+      try {
+        const res = await this.apiFetch(`/api/backups/${encodeURIComponent(backup.filename)}/verify`);
         if (res.ok) {
           const data = await res.json();
           if (data.valid) {
-            this.showToast(`Integrity verified: SHA-256 matches disk contents (${data.sha256.substring(0, 16)}...)`, 'success');
+            this.showToast(`Backup verified: SHA-256 matches the file (${data.sha256.substring(0, 16)}...)`, 'success');
           } else {
-            this.showToast('Verification warning: recorded SHA-256 does not match payload', 'error');
+            this.showToast('Backup check failed: the recorded SHA-256 does not match the file', 'error');
           }
         } else {
-          this.showToast('Backup file verification request failed', 'error');
+          this.showToast('Could not verify the backup', 'error');
         }
       } catch (e) {
         this.showToast(`Verification error: ${e.message}`, 'error');
@@ -908,7 +1127,7 @@ function cleanerApp() {
 
     async executeCloudExport() {
       if (!this.exportTargetBackup || !this.cloudToken) {
-        this.showToast('Please provide an authorization token for offsite export', 'warning');
+        this.showToast('Enter an access token to upload this backup', 'warning');
         return;
       }
       if (this.isOfflineMode) {
@@ -916,7 +1135,7 @@ function cleanerApp() {
         await new Promise(r => setTimeout(r, 600));
         this.cloudExporting = false;
         this.showCloudExportModal = false;
-        this.showToast(`Simulated offsite backup to ${this.cloudProvider} completed`, 'success');
+        this.showToast(`Demo upload to ${this.cloudProvider} completed`, 'success');
         return;
       }
       this.cloudExporting = true;
@@ -927,18 +1146,18 @@ function cleanerApp() {
           repo: this.cloudProvider === 'github' ? this.cloudRepo : null,
           folder_id: this.cloudProvider === 'google_drive' ? this.cloudFolderId : null,
         };
-        const res = await fetch(`/api/backups/${encodeURIComponent(this.exportTargetBackup.filename)}/cloud-export`, {
+        const res = await this.apiFetch(`/api/backups/${encodeURIComponent(this.exportTargetBackup.filename)}/cloud-export`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
         if (res.ok) {
           const result = await res.json();
-          this.showToast(`Offsite backup completed to ${result.provider} (${result.target_path})`, 'success', 5000);
+          this.showToast(`Backup uploaded to ${result.provider} (${result.target_path})`, 'success', 5000);
           this.showCloudExportModal = false;
         } else {
           const err = await res.json();
-          this.showToast(`Cloud export rejected: ${err.detail || 'Destination failed to accept archive'}`, 'error');
+          this.showToast(`Upload failed: ${err.detail || 'Destination rejected the backup'}`, 'error');
         }
       } catch (err) {
         this.showToast(`Export error: ${err.message}`, 'error');
@@ -958,27 +1177,38 @@ function cleanerApp() {
 
     async refreshAll() {
       await this.checkHealth();
+      if (this.apiAuthRequired) {
+        this.showToast('An API token is required. Add it in Connection settings.', 'warning');
+        this.activeTab = 'auth';
+        return;
+      }
       if (!this.dbHealthy) {
-        this.showToast('Operating in standalone preview sandbox', 'info');
+        this.showToast('The local service is unavailable. Demo mode is using sample data only.', 'info');
+        if (!this.isOfflineMode) {
+          this.isOfflineMode = true;
+          this.loadDemoMockData();
+        }
         return;
       }
       this.isOfflineMode = false;
+      await this.checkAuthStatus();
+      await this.checkRelayStatus();
       await this.loadChats();
       if (this.selectedChat) {
         await this.loadChatDetails(this.selectedChat.id);
       }
       await this.loadBackups();
-      this.showToast('Workspace synchronized with database', 'info');
+      this.showToast('Data refreshed', 'info');
     },
 
     selectAllCandidates() {
-      this.selectedCandidateIds = this.filteredCandidates().map(c => c.id);
-      this.showToast(`Staged all ${this.selectedCandidateIds.length} candidate messages`, 'info');
+      this.selectedCandidateIds = this.filteredCandidates().filter(c => this.candidateEligible(c)).map(c => c.id);
+      this.showToast(`Staged ${this.selectedCandidateIds.length} messages`, 'info');
     },
 
     deselectAllCandidates() {
       this.selectedCandidateIds = [];
-      this.showToast('Deselected all candidate messages', 'info');
+      this.showToast('Cleared staged messages', 'info');
     },
 
     formatBytes(bytes) {
@@ -1027,11 +1257,11 @@ function cleanerApp() {
         chat_id: demoChat.id,
         total_messages: 8,
         exact_duplicates: 2,
-        diff_duplicates: 2,
+        same_media_diff_caption: 2,
         dead_links: 1,
-        policy_flags: 1,
-        total_reclaimable_bytes: 4720000,
-        last_scanned: new Date().toISOString(),
+        policy_restricted: 1,
+        total_deletion_candidates: 2,
+        estimated_reclaimable_bytes: 2962000,
       };
       this.candidates = [
         {
@@ -1041,7 +1271,10 @@ function cleanerApp() {
           text: 'Infrastructure configuration snapshot and deployment keys',
           media_type: 'photo',
           file_size: 2450000,
-          flag_type: 'exact_duplicate',
+          flag_type: 'DUPLICATE_EXACT_MEDIA',
+          flag_types: ['DUPLICATE_EXACT_MEDIA'],
+          recommended_for_deletion: true,
+          confidence: 1.0,
           reason: 'Identical SHA-256 byte payload to Message #101',
         },
         {
@@ -1051,7 +1284,10 @@ function cleanerApp() {
           text: 'Workshop banner: Saturday 18:00 UTC https://t.me/joinchat/old_expired_link',
           media_type: 'photo',
           file_size: 1850000,
-          flag_type: 'diff_duplicate',
+          flag_type: 'DUPLICATE_SAME_MEDIA_DIFF_CAPTION',
+          flag_types: ['DUPLICATE_SAME_MEDIA_DIFF_CAPTION'],
+          recommended_for_deletion: false,
+          confidence: 0.78,
           reason: 'Superseded announcement variant of Message #206',
         },
         {
@@ -1061,7 +1297,10 @@ function cleanerApp() {
           text: 'Reference documentation: https://example-invalid-domain-404.org/specs.pdf',
           media_type: 'document',
           file_size: 512000,
-          flag_type: 'dead_link',
+          flag_type: 'STALE_DEAD_LINK',
+          flag_types: ['STALE_DEAD_LINK'],
+          recommended_for_deletion: true,
+          confidence: 0.99,
           reason: 'HTTP 404 Not Found unreachable target',
         },
         {
@@ -1071,11 +1310,14 @@ function cleanerApp() {
           text: 'Forwarded post restricted under Telegram platform terms policy',
           media_type: null,
           file_size: 0,
-          flag_type: 'policy_violation',
+          flag_type: 'POLICY_RESTRICTED',
+          flag_types: ['POLICY_RESTRICTED'],
+          recommended_for_deletion: false,
+          confidence: 1.0,
           reason: 'Flagged for restriction: terms violation',
         },
       ];
-      this.selectedCandidateIds = this.candidates.map((c) => c.id);
+      this.selectedCandidateIds = [];
       this.diffGroups = [
         {
           group_id: 'grp_photo_banner',
@@ -1097,7 +1339,11 @@ function cleanerApp() {
               media_id: 'photo_demo_banner',
             },
           ],
+          primary_message_id: 206,
           suggested_keep_id: 206,
+          recommended_preset: 'KEEP_NEWEST',
+          group_type: 'SAME_MEDIA_DIFF_CAPTION',
+          diff_summary: { similarity_ratio: 62.5, length_delta: 18 },
         },
       ];
       this.backups = [
@@ -1118,12 +1364,12 @@ function cleanerApp() {
     async generateDemoData() {
       if (this.isOfflineMode) {
         this.loadDemoMockData();
-        this.showToast('Loaded demonstration sandbox (Offline Mode)', 'success');
+        this.showToast('Loaded demo data', 'success');
         return;
       }
 
       try {
-        const res = await fetch('/api/demo/generate', { method: 'POST' });
+        const res = await this.apiFetch('/api/demo/generate', { method: 'POST' });
         if (res.ok) {
           await this.loadChats();
           const demoChat = this.chats.find((c) => c.id === 9999) || this.chats[0];
@@ -1140,7 +1386,7 @@ function cleanerApp() {
 
       this.isOfflineMode = true;
       this.loadDemoMockData();
-      this.showToast('Loaded demonstration sandbox (Offline Mode)', 'success');
+      this.showToast('Loaded demo data', 'success');
     },
   };
 }

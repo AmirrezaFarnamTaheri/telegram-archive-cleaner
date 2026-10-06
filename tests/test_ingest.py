@@ -156,3 +156,29 @@ async def test_live_ingestor_with_mock_client(db):
     assert len(stored) == 1
     assert stored[0].text == "Hello from Telethon"
     assert stored[0].chat_id == 555123
+
+
+def test_desktop_export_rejects_placeholder_file_strings(db, tmp_path):
+    """Verify that export placeholder strings like (File not included...) are discarded as media IDs."""
+    data = {
+        "name": "Placeholder Test",
+        "type": "public_channel",
+        "id": 112233,
+        "messages": [
+            {
+                "id": 1,
+                "type": "message",
+                "date": "2026-02-10T14:30:00",
+                "text": "File not downloaded locally",
+                "file": "(File not included. Change data exporting settings to download.)",
+            }
+        ],
+    }
+    json_path = tmp_path / "placeholder.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    parse_desktop_export_json(json_path, db)
+    msg = db.get_message(112233, 1)
+    assert msg is not None
+    assert msg.media_id is None

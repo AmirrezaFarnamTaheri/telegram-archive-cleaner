@@ -1,87 +1,85 @@
-# External Edge Relays & Cloud Storage Integration
+# Relays and Cloud Backups
 
-Telegram Archive Cleaner can offload bandwidth-heavy operations (dead-link checks, URL header probes, and external media downloads) to an external edge relay, such as a **Cloudflare Worker** or **Railway container**, and export verified pre-deletion archives directly to **Google Drive** or **GitHub**.
+Telegram Archive Cleaner can route external URL checks through a remote relay and can upload verified backup files to GitHub or Google Drive.
 
----
+These features are optional. Using them sends request or backup data to the configured external service.
 
-## 1. Why Use an Edge Relay?
+## URL-check relay
 
-When scanning large Telegram archives containing thousands of external web URLs:
-- Probing links locally consumes your personal bandwidth and data caps.
-- Local connections may encounter ISP throttling, regional blocks, or DNS timeouts.
-- Direct outbound requests could inadvertently probe internal network addresses without strict controls.
+A relay is useful when:
 
-By deploying the lightweight streaming relay (`relay/cloudflare/`):
-- **Zero local data usage for URL checks**: The edge relay makes the outbound HTTP requests directly from Cloudflare's global edge network.
-- **SSRF Protection**: Requests to loopback (`127.0.0.1`), RFC 1918 private subnets, cloud metadata endpoints (`169.254.169.254`), and carrier-grade NAT are rejected before the connection is made.
-- **Free tier friendly**: Cloudflare Workers offer 100,000 requests/day at zero cost.
+- you do not want external link checks to originate from your local connection;
+- local DNS or ISP filtering interferes with checks;
+- you want link-check traffic to run from a remote host.
 
----
+The relay still receives the target URL, and your client still exchanges request/response data with the relay.
 
-## 2. Deploying the Cloudflare Worker Relay
+### Network restrictions
 
-### Prerequisites
-- Node.js 18+ and `npm`
-- Cloudflare account (free tier)
+The relay rejects requests to disallowed targets such as:
 
-### Quick Setup
+- loopback addresses;
+- RFC 1918 private networks;
+- link-local addresses;
+- cloud metadata endpoints;
+- carrier-grade NAT ranges.
+
+These checks reduce SSRF risk but do not make an exposed relay safe without authentication and normal deployment hardening.
+
+## Cloudflare Worker relay
+
+### Requirements
+
+- Node.js 18+
+- npm
+- a Cloudflare account
+
+### Deploy
 
 ```bash
 cd relay/cloudflare
-npm install -g wrangler # if not already installed
+npm install -g wrangler
 wrangler login
-
-# Set your secret (must be at least 32 characters)
 wrangler secret put RELAY_SHARED_SECRET
-
-# Deploy to Cloudflare edge
 wrangler deploy
 ```
 
-Once deployed, Cloudflare gives you an endpoint URL, for example:
-`https://tg-relay.<your-subdomain>.workers.dev`
-
-### Configuring Telegram Archive Cleaner
-
-Add your relay credentials to `.env`:
+Then add the deployed URL and matching secret to `.env`:
 
 ```env
 RELAY_URL="https://tg-relay.<your-subdomain>.workers.dev"
-RELAY_SHARED_SECRET="your-secure-32-plus-character-secret"
+RELAY_SHARED_SECRET="your-random-secret"
 ```
 
-The Web Dashboard will display **Edge Relay: Active (Cloudflare Worker)** in the navigation bar, and all subsequent link audits will automatically route through your edge worker.
+The application will send supported external URL checks through that relay.
 
----
+## Backup upload
 
-## 3. Offsite Cloud Export (Google Drive & GitHub)
+Backups are created locally first and must pass their checksum check before upload.
 
-Before running irreversible message deletions, the cleaner creates an encrypted/hashed local snapshot in `backups/`. You can push these snapshots to offsite cloud storage:
+### GitHub
 
-### Export to GitHub Repository
-Via API:
-```bash
-POST /api/backups/<backup_filename>/cloud-export
-Content-Type: application/json
+`POST /api/backups/<backup_filename>/cloud-export`
 
+```json
 {
   "provider": "github",
-  "token": "ghp_yourPersonalAccessToken",
-  "repo": "your-username/telegram-backups",
+  "token": "github-token",
+  "repo": "owner/repository",
   "branch": "main"
 }
 ```
 
-### Export to Google Drive
-Via API:
-```bash
-POST /api/backups/<backup_filename>/cloud-export
-Content-Type: application/json
+### Google Drive
 
+`POST /api/backups/<backup_filename>/cloud-export`
+
+```json
 {
   "provider": "google_drive",
-  "token": "ya29.yourGoogleOAuthAccessToken",
-  "folder_id": "optional-drive-folder-id"
+  "token": "google-oauth-access-token",
+  "folder_id": "optional-folder-id"
 }
 ```
-The export uses Google Drive's **256 KiB aligned resumable streaming protocol** and verifies SHA-256 integrity upon arrival.
+
+Google Drive uploads use a resumable upload session. GitHub uploads use the Contents API.

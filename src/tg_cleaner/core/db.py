@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,27 @@ from tg_cleaner.core.models import (
     RetentionPreset,
     ScanStats,
 )
+
+
+def _adapt_datetime(value: datetime) -> str:
+    """Serialize datetimes explicitly instead of relying on sqlite3 defaults."""
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC).replace(tzinfo=None)
+    return value.isoformat(sep=" ")
+
+
+def _convert_datetime(raw: bytes) -> datetime:
+    """Restore values written by :func:`_adapt_datetime`."""
+    return datetime.fromisoformat(raw.decode("utf-8"))
+
+
+def _utc_now_naive() -> datetime:
+    """Return UTC while preserving the project's existing naive-datetime model."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+sqlite3.register_adapter(datetime, _adapt_datetime)
+sqlite3.register_converter("TIMESTAMP", _convert_datetime)
 
 
 class DatabaseManager:
@@ -131,6 +152,16 @@ class DatabaseManager:
 
                 CREATE INDEX IF NOT EXISTS idx_flags_chat_cand ON analysis_flags(chat_id, is_candidate_for_deletion);
                 CREATE INDEX IF NOT EXISTS idx_flags_group ON analysis_flags(group_id);
+                CREATE INDEX IF NOT EXISTS idx_msg_active_chat_date ON messages(chat_id, is_deleted_locally, date);
+
+                -- Older builds could accumulate duplicate flags when a single analyzer was rerun.
+                DELETE FROM analysis_flags
+                WHERE id NOT IN (
+                    SELECT MAX(id) FROM analysis_flags
+                    GROUP BY chat_id, message_id, flag_type, IFNULL(group_id, '')
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_flags_unique_finding
+                ON analysis_flags(chat_id, message_id, flag_type, IFNULL(group_id, ''));
 
                 CREATE TABLE IF NOT EXISTS backups (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,6 +170,15 @@ class DatabaseManager:
                     backup_file TEXT NOT NULL,
                     message_count INTEGER NOT NULL,
                     sha256_checksum TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS review_overrides (
+                    chat_id INTEGER NOT NULL,
+                    message_id INTEGER NOT NULL,
+                    is_candidate_for_deletion BOOLEAN NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (chat_id, message_id),
+                    FOREIGN KEY (chat_id, message_id) REFERENCES messages(chat_id, id) ON DELETE CASCADE
                 );
 
                 CREATE TABLE IF NOT EXISTS deletion_logs (
@@ -153,11 +193,24 @@ class DatabaseManager:
             )
 
     def is_healthy(self) -> bool:
-        """Check database integrity and connection."""
+        """Check that SQLite can read the schema and passes a lightweight integrity check."""
         try:
             with self.get_connection() as conn:
-                res = conn.execute("SELECT 1;").fetchone()
-                return bool(res and res[0] == 1)
+                required = {
+                    "chats",
+                    "messages",
+                    "analysis_flags",
+                    "duplicate_groups",
+                    "backups",
+                    "review_overrides",
+                }
+                rows = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table';"
+                ).fetchall()
+                if not required.issubset({row[0] for row in rows}):
+                    return False
+                check = conn.execute("PRAGMA quick_check;").fetchone()
+                return bool(check and check[0] == "ok")
         except Exception:
             return False
 
@@ -181,7 +234,7 @@ class DatabaseManager:
                     chat.username,
                     chat.chat_type,
                     chat.total_messages,
-                    chat.last_scanned or datetime.utcnow(),
+                    chat.last_scanned or _utc_now_naive(),
                 ),
             )
 
@@ -227,7 +280,11 @@ class DatabaseManager:
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 ON CONFLICT(chat_id, id) DO UPDATE SET
+                    date = excluded.date,
                     edit_date = excluded.edit_date,
+                    sender_id = excluded.sender_id,
+                    sender_name = excluded.sender_name,
+                    is_deleted_sender = excluded.is_deleted_sender,
                     text = excluded.text,
                     raw_text = excluded.raw_text,
                     text_hash = excluded.text_hash,
@@ -239,6 +296,9 @@ class DatabaseManager:
                     width = excluded.width,
                     height = excluded.height,
                     dhash = excluded.dhash,
+                    fwd_from_id = excluded.fwd_from_id,
+                    fwd_channel_post = excluded.fwd_channel_post,
+                    reply_to_msg_id = excluded.reply_to_msg_id,
                     restriction_reason = excluded.restriction_reason,
                     has_links = excluded.has_links,
                     extracted_urls = excluded.extracted_urls;
@@ -331,6 +391,21 @@ class DatabaseManager:
             ).fetchall()
             return [self._row_to_message(r) for r in rows]
 
+    def get_active_messages(
+        self, chat_id: int, limit: int = 10000, offset: int = 0
+    ) -> list[MessageRecord]:
+        """Fetch messages that have not already been deleted by this application."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE chat_id = ? AND is_deleted_locally = 0
+                ORDER BY date ASC LIMIT ? OFFSET ?;
+                """,
+                (chat_id, limit, offset),
+            ).fetchall()
+            return [self._row_to_message(r) for r in rows]
+
     def get_messages_by_ids(self, chat_id: int, message_ids: list[int]) -> list[MessageRecord]:
         """Fetch messages by a list of IDs."""
         if not message_ids:
@@ -389,42 +464,73 @@ class DatabaseManager:
     def get_duplicate_group(self, group_id: str) -> DuplicateGroup | None:
         """Retrieve a specific duplicate group by its ID."""
         with self.get_connection() as conn:
-            row = conn.execute("SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)
+            ).fetchone()
             if not row:
                 return None
             return self._row_to_duplicate_group(row)
 
+    @staticmethod
+    def _flag_rows(flags: list[AnalysisFlag]) -> list[tuple[Any, ...]]:
+        return [
+            (
+                f.message_id,
+                f.chat_id,
+                f.flag_type.value,
+                f.group_id,
+                1 if f.is_candidate_for_deletion else 0,
+                f.confidence,
+                json.dumps(f.details, ensure_ascii=False, sort_keys=True),
+            )
+            for f in flags
+        ]
+
+    def _upsert_flags_on_connection(
+        self, conn: sqlite3.Connection, flags: list[AnalysisFlag]
+    ) -> None:
+        if not flags:
+            return
+        conn.executemany(
+            """
+            INSERT INTO analysis_flags (
+                message_id, chat_id, flag_type, group_id,
+                is_candidate_for_deletion, confidence, details
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(chat_id, message_id, flag_type, IFNULL(group_id, '')) DO UPDATE SET
+                is_candidate_for_deletion = excluded.is_candidate_for_deletion,
+                confidence = excluded.confidence,
+                details = excluded.details;
+            """,
+            self._flag_rows(flags),
+        )
+        conn.execute(
+            """
+            UPDATE analysis_flags
+            SET is_candidate_for_deletion = (
+                SELECT o.is_candidate_for_deletion
+                FROM review_overrides o
+                WHERE o.chat_id = analysis_flags.chat_id AND o.message_id = analysis_flags.message_id
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM review_overrides o
+                WHERE o.chat_id = analysis_flags.chat_id AND o.message_id = analysis_flags.message_id
+            );
+            """
+        )
+
     def upsert_flags(self, flags: list[AnalysisFlag]) -> None:
-        """Batch insert analysis flags."""
+        """Idempotently insert or refresh analysis findings."""
         if not flags:
             return
         with self.get_connection() as conn:
-            conn.executemany(
-                """
-                INSERT INTO analysis_flags (
-                    message_id, chat_id, flag_type, group_id,
-                    is_candidate_for_deletion, confidence, details
-                ) VALUES (?, ?, ?, ?, ?, ?, ?);
-                """,
-                [
-                    (
-                        f.message_id,
-                        f.chat_id,
-                        f.flag_type.value,
-                        f.group_id,
-                        1 if f.is_candidate_for_deletion else 0,
-                        f.confidence,
-                        json.dumps(f.details),
-                    )
-                    for f in flags
-                ],
-            )
+            self._upsert_flags_on_connection(conn, flags)
 
     def update_flags_for_group(self, group_id: str, flags: list[AnalysisFlag]) -> None:
-        """Replace all analysis flags for a specific duplicate group."""
+        """Atomically replace all analysis flags for a specific duplicate group."""
         with self.get_connection() as conn:
             conn.execute("DELETE FROM analysis_flags WHERE group_id = ?;", (group_id,))
-        self.upsert_flags(flags)
+            self._upsert_flags_on_connection(conn, flags)
 
     def clear_flags_for_chat(self, chat_id: int) -> None:
         """Remove existing analysis flags and duplicate groups for a chat."""
@@ -454,6 +560,52 @@ class DatabaseManager:
             ).fetchall()
             return [self._row_to_flag(r) for r in rows]
 
+    def set_message_deletion_eligibility(
+        self, chat_id: int, message_id: int, eligible: bool
+    ) -> int:
+        """Manually approve or revoke deletion eligibility for an existing finding.
+
+        Returns the number of findings updated. A message with no current finding cannot be
+        made eligible through this method.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE analysis_flags
+                SET is_candidate_for_deletion = ?
+                WHERE chat_id = ? AND message_id = ?
+                  AND EXISTS (
+                    SELECT 1 FROM messages m
+                    WHERE m.chat_id = analysis_flags.chat_id
+                      AND m.id = analysis_flags.message_id
+                      AND m.is_deleted_locally = 0
+                  );
+                """,
+                (1 if eligible else 0, chat_id, message_id),
+            )
+            count = cursor.rowcount
+            if count > 0:
+                conn.execute(
+                    """
+                    INSERT INTO review_overrides (chat_id, message_id, is_candidate_for_deletion, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(chat_id, message_id) DO UPDATE SET
+                        is_candidate_for_deletion = excluded.is_candidate_for_deletion,
+                        updated_at = excluded.updated_at;
+                    """,
+                    (chat_id, message_id, 1 if eligible else 0, _utc_now_naive()),
+                )
+            return count
+
+    def get_review_overrides(self, chat_id: int) -> dict[int, bool]:
+        """Fetch manual review overrides for a chat as a mapping of message_id -> is_candidate."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT message_id, is_candidate_for_deletion FROM review_overrides WHERE chat_id = ?;",
+                (chat_id,),
+            ).fetchall()
+            return {r["message_id"]: bool(r["is_candidate_for_deletion"]) for r in rows}
+
     def get_deletion_candidates(self, chat_id: int) -> list[MessageRecord]:
         """Get all messages flagged as candidates for deletion."""
         with self.get_connection() as conn:
@@ -461,7 +613,10 @@ class DatabaseManager:
                 """
                 SELECT DISTINCT m.* FROM messages m
                 JOIN analysis_flags f ON m.chat_id = f.chat_id AND m.id = f.message_id
-                WHERE m.chat_id = ? AND f.is_candidate_for_deletion = 1 AND m.is_deleted_locally = 0
+                LEFT JOIN review_overrides o ON m.chat_id = o.chat_id AND m.id = o.message_id
+                WHERE m.chat_id = ?
+                  AND COALESCE(o.is_candidate_for_deletion, f.is_candidate_for_deletion) = 1
+                  AND m.is_deleted_locally = 0
                 ORDER BY m.date ASC;
                 """,
                 (chat_id,),
@@ -478,6 +633,39 @@ class DatabaseManager:
                 f"UPDATE messages SET is_deleted_locally = 1 WHERE chat_id = ? AND id IN ({placeholders});",
                 [chat_id, *message_ids],
             )
+            conn.execute(
+                f"DELETE FROM review_overrides WHERE chat_id = ? AND message_id IN ({placeholders});",
+                [chat_id, *message_ids],
+            )
+
+    def record_deletion_log(
+        self, chat_id: int, message_id: int, status: str, error_message: str | None = None
+    ) -> None:
+        """Persist the outcome of one attempted deletion for auditability."""
+        with self.get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO deletion_logs (chat_id, message_id, deleted_at, status, error_message)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                (chat_id, message_id, _utc_now_naive(), status, error_message),
+            )
+
+    def list_deletion_logs(
+        self, chat_id: int | None = None, limit: int = 500
+    ) -> list[dict[str, Any]]:
+        """Return recent deletion audit records."""
+        with self.get_connection() as conn:
+            if chat_id is None:
+                rows = conn.execute(
+                    "SELECT * FROM deletion_logs ORDER BY id DESC LIMIT ?;", (limit,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM deletion_logs WHERE chat_id = ? ORDER BY id DESC LIMIT ?;",
+                    (chat_id, limit),
+                ).fetchall()
+            return [dict(row) for row in rows]
 
     def record_backup(
         self, chat_id: int, backup_file: str, message_count: int, checksum: str
@@ -489,7 +677,7 @@ class DatabaseManager:
                 INSERT INTO backups (chat_id, timestamp, backup_file, message_count, sha256_checksum)
                 VALUES (?, ?, ?, ?, ?);
                 """,
-                (chat_id, datetime.utcnow(), backup_file, message_count, checksum),
+                (chat_id, _utc_now_naive(), backup_file, message_count, checksum),
             )
 
     def list_backups(self, chat_id: int | None = None) -> list[dict[str, Any]]:
@@ -505,58 +693,52 @@ class DatabaseManager:
             return [dict(r) for r in rows]
 
     def get_scan_stats(self, chat_id: int) -> ScanStats:
-        """Compute aggregated statistics for a chat."""
+        """Compute aggregated statistics over active messages without double counting."""
         with self.get_connection() as conn:
+            active_filter = "m.chat_id = ? AND m.is_deleted_locally = 0"
             total_msg = conn.execute(
-                "SELECT COUNT(*) FROM messages WHERE chat_id = ? AND is_deleted_locally = 0;",
-                (chat_id,),
+                "SELECT COUNT(*) FROM messages m WHERE " + active_filter, (chat_id,)
             ).fetchone()[0]
 
-            exact_dup = conn.execute(
-                """
-                SELECT COUNT(DISTINCT message_id) FROM analysis_flags
-                WHERE chat_id = ? AND flag_type IN ('DUPLICATE_EXACT_TEXT', 'DUPLICATE_EXACT_MEDIA');
-                """,
-                (chat_id,),
-            ).fetchone()[0]
+            def count_flagged(flag_types: tuple[str, ...]) -> int:
+                placeholders = ",".join("?" for _ in flag_types)
+                return conn.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT f.message_id)
+                    FROM analysis_flags f
+                    JOIN messages m ON m.chat_id = f.chat_id AND m.id = f.message_id
+                    WHERE {active_filter} AND f.flag_type IN ({placeholders});
+                    """,
+                    (chat_id, *flag_types),
+                ).fetchone()[0]
 
-            same_media_diff = conn.execute(
-                """
-                SELECT COUNT(DISTINCT message_id) FROM analysis_flags
-                WHERE chat_id = ? AND flag_type = 'DUPLICATE_SAME_MEDIA_DIFF_CAPTION';
-                """,
-                (chat_id,),
-            ).fetchone()[0]
-
-            dead_links = conn.execute(
-                """
-                SELECT COUNT(DISTINCT message_id) FROM analysis_flags
-                WHERE chat_id = ? AND flag_type IN ('STALE_DEAD_LINK', 'STALE_EXPIRED_INVITE');
-                """,
-                (chat_id,),
-            ).fetchone()[0]
-
-            policy_restr = conn.execute(
-                """
-                SELECT COUNT(DISTINCT message_id) FROM analysis_flags
-                WHERE chat_id = ? AND flag_type IN ('POLICY_RESTRICTED', 'POLICY_EMPTY_MEDIA', 'POLICY_DELETED_ACCOUNT');
-                """,
-                (chat_id,),
-            ).fetchone()[0]
+            exact_dup = count_flagged(("DUPLICATE_EXACT_TEXT", "DUPLICATE_EXACT_MEDIA"))
+            same_media_diff = count_flagged(("DUPLICATE_SAME_MEDIA_DIFF_CAPTION",))
+            dead_links = count_flagged(("STALE_DEAD_LINK", "STALE_EXPIRED_INVITE"))
+            policy_restr = count_flagged(
+                ("POLICY_RESTRICTED", "POLICY_EMPTY_MEDIA", "POLICY_DELETED_ACCOUNT")
+            )
 
             cand_count = conn.execute(
-                """
-                SELECT COUNT(DISTINCT message_id) FROM analysis_flags
-                WHERE chat_id = ? AND is_candidate_for_deletion = 1;
+                f"""
+                SELECT COUNT(DISTINCT f.message_id)
+                FROM analysis_flags f
+                JOIN messages m ON m.chat_id = f.chat_id AND m.id = f.message_id
+                WHERE {active_filter} AND f.is_candidate_for_deletion = 1;
                 """,
                 (chat_id,),
             ).fetchone()[0]
 
             reclaimable_bytes = conn.execute(
                 """
-                SELECT COALESCE(SUM(m.file_size), 0) FROM messages m
-                JOIN analysis_flags f ON m.chat_id = f.chat_id AND m.id = f.message_id
-                WHERE m.chat_id = ? AND f.is_candidate_for_deletion = 1;
+                SELECT COALESCE(SUM(m.file_size), 0)
+                FROM messages m
+                WHERE m.chat_id = ? AND m.is_deleted_locally = 0
+                  AND EXISTS (
+                    SELECT 1 FROM analysis_flags f
+                    WHERE f.chat_id = m.chat_id AND f.message_id = m.id
+                      AND f.is_candidate_for_deletion = 1
+                  );
                 """,
                 (chat_id,),
             ).fetchone()[0]

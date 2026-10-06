@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "telegram-archive-cleaner"
 version = "1.0.0"
-description = "Intelligent Telegram Archive Cleaner with multi-engine duplicate detection, same-media different-caption diffing, link health checking, policy restriction auditing, pre-deletion backups, and local web dashboard."
+description = "Review and clean Telegram archives with duplicate detection, link checks, backups, a local web UI, and CLI tools."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

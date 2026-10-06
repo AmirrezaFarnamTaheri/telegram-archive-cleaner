@@ -1,102 +1,83 @@
-# Remote Relay & Cloud Deployment Guide (Railway, Cloudflare & Proxies)
+# Deployment and Proxy Guide
 
-This guide documents how to run **Telegram Archive Cleaner** on cloud relays (Railway, VPS, Docker, or behind Cloudflare Tunnels) and configure MTProto relays to maximize scanning speed while minimizing local data/bandwidth consumption.
+This guide covers Railway, Cloudflare Tunnel, and Telegram proxy settings.
 
----
+## Railway
 
-## 1. Why Run on a Cloud Relay?
+Railway can run the FastAPI service from the repository Dockerfile.
 
-When auditing large Telegram channels or Saved Messages archives containing thousands of posts:
-- **Zero Local Bandwidth Usage**: All MTProto message queries, thumbnail fetching for perceptual hashing, and dead-link HTTP checks occur between the cloud server datacenter and Telegram servers over gigabit connections.
-- **Bypasses ISP Throttling / Censorship**: Running on Railway or behind a relay circumvents local internet provider throttling or MTProto blocking.
-- **Fast Interactive Web UI**: The user accesses the web dashboard from any browser or phone over lightweight HTTPS, with all heavy processing performed remotely.
+1. Push or fork the repository to GitHub.
+2. Create a Railway project from that repository.
+3. Set the variables you need, for example:
 
----
+```env
+TELEGRAM_API_ID=1234567
+TELEGRAM_API_HASH=your_api_hash
+API_TOKEN=choose-a-secret-token
+```
 
-## 2. Option A: One-Click Deploy to Railway
+4. Mount persistent storage for the database and backups.
+5. Expose the service only after API authentication and any additional access controls are configured.
 
-Railway provides container hosting with automatic HTTPS and persistent volume support.
+The app's ASGI entry point is `tg_cleaner.web.app:app`.
 
-### Step-by-Step Setup:
-1. Fork or push this repository to GitHub.
-2. In [Railway.app](https://railway.app), click **New Project** -> **Deploy from GitHub repo**.
-3. Railway automatically detects `Dockerfile` and `railway.toml`.
-4. Under **Variables**, configure:
-   - `TELEGRAM_API_ID`: Your API ID from `my.telegram.org`
-   - `TELEGRAM_API_HASH`: Your API Hash from `my.telegram.org`
-   - `TELEGRAM_PHONE`: Your phone number (e.g. `+1234567890`)
-   - `DATA_SAVER_MODE`: `true`
-   - `API_TOKEN`: A secret access token for your dashboard (recommended for public deployments)
-5. Under **Settings** -> **Volumes**, mount a persistent volume at `/app/data` and `/app/backups`.
-6. Railway assigns a public URL (e.g., `https://tg-cleaner-production.up.railway.app`).
+## Cloudflare Tunnel
 
----
+Cloudflare Tunnel can expose a locally running instance without inbound port forwarding.
 
-## 3. Option B: Cloudflare Tunnel (`cloudflared`) Integration
+Install and authenticate `cloudflared`, then create a tunnel:
 
-If running the cleaner on a home server, VPS, or local machine, Cloudflare Tunnel provides:
-- **Zero Port Forwarding**: No open firewall ports required.
-- **Cloudflare Global Edge Caching & Compression**: Minimizes bandwidth required to load UI assets and message previews.
-- **Cloudflare Access (Zero Trust)**: Protect your dashboard with email OTP, Google OAuth, or GitHub login before anyone can access the deletion buttons.
+```bash
+cloudflared tunnel login
+cloudflared tunnel create tg-cleaner
+cloudflared tunnel route dns tg-cleaner cleaner.example.com
+```
 
-### Setup:
-1. Install `cloudflared`:
-   ```bash
-   # Windows (via winget or choco)
-   winget install Cloudflare.cloudflared
-   
-   # Linux
-   sudo apt-get install cloudflared
-   ```
-2. Authenticate and create a tunnel:
-   ```bash
-   cloudflared tunnel login
-   cloudflared tunnel create tg-cleaner
-   ```
-3. Use the template in `config/cloudflared/tunnel.yml.example`:
-   ```yaml
-   tunnel: <your-tunnel-id>
-   credentials-file: ~/.cloudflared/<your-tunnel-id>.json
+Example configuration:
 
-   ingress:
-     - hostname: cleaner.yourdomain.com
-       service: http://localhost:8000
-     - service: http_status:404
-   ```
-4. Start the tunnel:
-   ```bash
-   cloudflared tunnel run tg-cleaner
-   ```
+```yaml
+tunnel: <your-tunnel-id>
+credentials-file: ~/.cloudflared/<your-tunnel-id>.json
 
----
+ingress:
+  - hostname: cleaner.example.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404
+```
 
-## 4. Option C: MTProto Proxy / SOCKS5 Relay (Local or Containerized)
+Run it with:
 
-If running locally but you want all Telegram MTProto traffic routed through a high-speed relay or VPN proxy to conserve specific network quotas:
-Set in your `.env`:
+```bash
+cloudflared tunnel run tg-cleaner
+```
+
+If the service is reachable from the public internet, set `API_TOKEN` and consider an additional access layer such as Cloudflare Access.
+
+## Telegram proxy settings
+
+Telegram traffic can use SOCKS5, HTTP, or MTProxy settings.
+
+### SOCKS5
+
 ```env
 TELEGRAM_PROXY_TYPE=socks5
 TELEGRAM_PROXY_HOST=127.0.0.1
 TELEGRAM_PROXY_PORT=1080
-# Optional credentials:
 TELEGRAM_PROXY_USERNAME=
 TELEGRAM_PROXY_PASSWORD=
 ```
-Or for MTProxy:
+
+### MTProxy
+
 ```env
 TELEGRAM_PROXY_TYPE=mtproxy
 TELEGRAM_PROXY_HOST=proxy.example.com
 TELEGRAM_PROXY_PORT=443
 TELEGRAM_PROXY_SECRET=ee1122334455...
 ```
-Telethon connects through the proxy automatically, ensuring Telegram packets route exclusively through the relay.
 
----
+The proxy changes the route used by the Telegram client. It does not remove normal bandwidth use between the application and the proxy.
 
-## 5. Bandwidth Saver Mode (`DATA_SAVER_MODE=true`)
+## Data-saver mode
 
-When `DATA_SAVER_MODE=true`:
-1. **Zero Full-Media Downloads**: Photos, videos, documents, and voice notes are never downloaded.
-2. **Metadata-First Deduplication**: Identical files are matched via Telegram `photo.id` / `document.id` or `(file_size, mime_type, duration)` tuples.
-3. **Micro-Thumbnails Only**: Only thumbnail index `0` (typically $< 1\text{ KB}$) is downloaded when perceptual hashing is needed for ambiguous photos.
-4. **Compressed API Payloads**: FastAPI responses are minimized and paginated to minimize client transfer.
+When `DATA_SAVER_MODE=true`, the application avoids full-media downloads where possible and prefers Telegram metadata or small thumbnails for matching. Approximate metadata matches must not be treated as proof that two files are identical.

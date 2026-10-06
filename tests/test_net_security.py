@@ -1,5 +1,12 @@
 """Tests for net_security module including SSRF protection and URL normalization."""
 
+from pathlib import Path
+from unittest.mock import AsyncMock
+
+import pytest
+
+from tg_cleaner.analyzer.links import LinkHealthChecker
+from tg_cleaner.core.db import DatabaseManager
 from tg_cleaner.core.net_security import (
     guess_filename_from_url,
     is_private_ip,
@@ -85,3 +92,22 @@ def test_is_safe_public_url():
     # Credentials
     safe, reason = is_safe_public_url("http://user:pass@example.com")
     assert safe is False
+
+
+@pytest.mark.asyncio
+async def test_link_checker_does_not_mark_blocked_private_url_dead(tmp_path: Path):
+    """An SSRF-blocked probe is unknown, not evidence that a link is dead."""
+    db = DatabaseManager(str(tmp_path / "links.db"))
+    db.init_db()
+    checker = LinkHealthChecker(db=db)
+    http_client = AsyncMock()
+
+    is_dead, reason = await checker._check_http_url(
+        http_client,
+        "http://127.0.0.1/private",
+    )
+
+    assert is_dead is False
+    assert "Skipped unsafe target" in reason
+    http_client.head.assert_not_called()
+    http_client.get.assert_not_called()

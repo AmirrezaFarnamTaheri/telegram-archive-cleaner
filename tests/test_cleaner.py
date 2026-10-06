@@ -6,14 +6,17 @@ Verifies pre-deletion JSON snapshots, SHA-256 verification,
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from tg_cleaner.cleaner.backup import BackupManager
+from tg_cleaner.cleaner.cloud_export import CloudExportManager
 from tg_cleaner.cleaner.executor import DeletionExecutor
 from tg_cleaner.core.db import DatabaseManager
 from tg_cleaner.core.models import ChatRecord, MessageRecord
@@ -119,6 +122,9 @@ async def test_deletion_executor_live_batching(
     backup_dir = tmp_path / "backups"
     backup_mgr = BackupManager(backup_dir=str(backup_dir))
     mock_client = AsyncMock()
+    mock_client.get_messages.side_effect = lambda chat_id, ids: [
+        SimpleNamespace(id=mid) for mid in ids
+    ]
 
     executor = DeletionExecutor(
         db=test_db,
@@ -167,6 +173,9 @@ async def test_deletion_executor_flood_wait(
     backup_dir = tmp_path / "backups"
     backup_mgr = BackupManager(backup_dir=str(backup_dir))
     mock_client = AsyncMock()
+    mock_client.get_messages.side_effect = lambda chat_id, ids: [
+        SimpleNamespace(id=mid) for mid in ids
+    ]
 
     # Raise flood wait once (1 sec), then succeed
     mock_client.delete_messages.side_effect = [
@@ -186,3 +195,72 @@ async def test_deletion_executor_flood_wait(
 
     assert result.deleted_count == 2
     assert mock_client.delete_messages.call_count == 2
+
+
+def test_backup_fails_closed_when_any_requested_message_is_missing(
+    test_db: DatabaseManager, sample_messages: list[MessageRecord], tmp_path: Path
+):
+    """Never create a partial snapshot for a deletion request."""
+    manager = BackupManager(backup_dir=str(tmp_path / "backups"))
+
+    with pytest.raises(RuntimeError, match="cannot back up every requested message"):
+        manager.create_backup(chat_id=1, message_ids=[1, 2, 999999], db=test_db)
+
+    assert manager.list_backups(chat_id=1) == []
+    assert test_db.list_backups(chat_id=1) == []
+
+
+def test_backup_rejects_duplicate_message_ids(
+    test_db: DatabaseManager, sample_messages: list[MessageRecord], tmp_path: Path
+):
+    """A snapshot's coverage metadata must be one-to-one with the request."""
+    manager = BackupManager(backup_dir=str(tmp_path / "backups"))
+
+    with pytest.raises(ValueError, match="duplicate message IDs"):
+        manager.create_backup(chat_id=1, message_ids=[1, 1], db=test_db)
+
+
+def test_cloud_verifier_matches_backup_checksum_for_unicode(
+    test_db: DatabaseManager, sample_messages: list[MessageRecord], tmp_path: Path
+):
+    """Offsite verification must hash non-ASCII backup content identically."""
+    message = test_db.get_messages_by_ids(1, [1])[0]
+    message.text = "سلام دنیا 👋"
+    message.raw_text = message.text
+    test_db.upsert_messages([message])
+
+    backup_dir = tmp_path / "backups"
+    backup_manager = BackupManager(backup_dir=str(backup_dir))
+    backup_file = backup_manager.create_backup(chat_id=1, message_ids=[1], db=test_db)
+
+    cloud_manager = CloudExportManager(backup_dir=backup_dir)
+    valid, digest, payload = cloud_manager.verify_backup_integrity(backup_file)
+
+    assert valid is True
+    assert digest == payload["sha256"]
+
+
+def test_backup_verifier_legacy_ascii_checksum_fallback(tmp_path: Path):
+    """Verify that legacy v1.0 / versionless backups with ASCII-escaped hashes pass verification."""
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    manager = BackupManager(backup_dir=str(backup_dir))
+
+    messages_payload = [{"id": 1, "text": "سلام دنیا"}]
+    # Legacy ASCII-escaped checksum
+    legacy_bytes = json.dumps(messages_payload, sort_keys=True).encode("utf-8")
+    legacy_sha = hashlib.sha256(legacy_bytes).hexdigest()
+
+    backup_file = backup_dir / "chat_1_legacy.json"
+    snapshot_data = {
+        "version": "1.0",
+        "chat_id": 1,
+        "message_count": 1,
+        "requested_message_ids": [1],
+        "sha256": legacy_sha,
+        "messages": messages_payload,
+    }
+    with open(backup_file, "w", encoding="utf-8") as f:
+        json.dump(snapshot_data, f, indent=2, ensure_ascii=False)
+
+    assert manager.verify_backup(backup_file) is True

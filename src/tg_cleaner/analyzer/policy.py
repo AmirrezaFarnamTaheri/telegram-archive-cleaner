@@ -17,8 +17,8 @@ class PolicyAuditor:
         self.db = db
 
     def audit_policy_restrictions(self, chat_id: int) -> list[AnalysisFlag]:
-        """Flag all messages affected by policy restrictions or deleted senders."""
-        messages = self.db.get_messages(chat_id)
+        """Flag policy/integrity findings for review without authorizing deletion."""
+        messages = self.db.get_active_messages(chat_id)
         flags: list[AnalysisFlag] = []
 
         for msg in messages:

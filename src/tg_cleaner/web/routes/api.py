@@ -9,10 +9,11 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from tg_cleaner.analyzer.dedupe import DeduplicationEngine
 from tg_cleaner.analyzer.links import LinkHealthChecker
+from tg_cleaner.analyzer.llm import SemanticLLMAnalyzer
 from tg_cleaner.analyzer.policy import PolicyAuditor
 from tg_cleaner.analyzer.stale import StaleContentAnalyzer
 from tg_cleaner.cleaner.backup import BackupManager
@@ -20,12 +21,15 @@ from tg_cleaner.cleaner.executor import DeletionExecutor, DeletionResult
 from tg_cleaner.core.db import DatabaseManager
 from tg_cleaner.core.models import (
     ChatRecord,
+    FlagType,
     MessageRecord,
     RetentionPreset,
     ScanStats,
 )
 from tg_cleaner.core.net_security import sanitize_filename
-from tg_cleaner.ingest.desktop_export import import_desktop_export_from_dict
+from tg_cleaner.core.settings import settings
+from tg_cleaner.ingest.desktop_export import import_desktop_export_payload
+from tg_cleaner.ingest.live import LiveIngestor
 
 router = APIRouter(prefix="/api", tags=["cleaner"])
 
@@ -61,12 +65,63 @@ class CloudExportRequest(BaseModel):
     folder_id: str | None = None
 
 
+class CandidateResponse(MessageRecord):
+    """Message plus the analysis details that caused it to be listed."""
+
+    flag_type: FlagType
+    recommended_for_deletion: bool = True
+    flag_types: list[FlagType] = Field(default_factory=list)
+    group_id: str | None = None
+    confidence: float = 1.0
+    reason: str = ""
+    flag_details: list[dict[str, Any]] = Field(default_factory=list)
+
+
+def _flag_reason(flag_type: FlagType, details: dict[str, Any]) -> str:
+    """Turn flag details into a short reason for the UI."""
+    explicit = details.get("reason")
+    if explicit:
+        return str(explicit)
+    if details.get("preset"):
+        preset = str(details["preset"]).replace("_", " ").title()
+        return f"Retention choice: {preset}"
+    if details.get("matched_by"):
+        return f"Media matched by {details['matched_by']}"
+    if details.get("restriction"):
+        return f"Telegram restriction: {details['restriction']}"
+    if details.get("media_type"):
+        return f"Inaccessible {details['media_type']} media"
+    if details.get("age_days") is not None:
+        return f"Older than retention threshold: {details['age_days']} days"
+
+    labels = {
+        FlagType.DUPLICATE_EXACT_TEXT: "Exact duplicate text",
+        FlagType.DUPLICATE_FUZZY_TEXT: "Near-duplicate text",
+        FlagType.DUPLICATE_EXACT_MEDIA: "Exact duplicate media",
+        FlagType.DUPLICATE_VISUAL_MEDIA: "Visually similar media (review required)",
+        FlagType.DUPLICATE_SAME_MEDIA_DIFF_CAPTION: "Same media with a different caption",
+        FlagType.DUPLICATE_FORWARD: "Duplicate forward chain",
+        FlagType.STALE_DEAD_LINK: "Dead external link",
+        FlagType.STALE_EXPIRED_INVITE: "Expired Telegram invite",
+        FlagType.STALE_OUTDATED_TIME: "Stale content",
+        FlagType.STALE_SUPERSEDED_LLM: "Superseded content",
+        FlagType.POLICY_RESTRICTED: "Telegram policy restriction",
+        FlagType.POLICY_EMPTY_MEDIA: "Empty or inaccessible media",
+        FlagType.POLICY_DELETED_ACCOUNT: "Sender account no longer exists",
+    }
+    return labels.get(flag_type, flag_type.value.replace("_", " ").title())
+
+
 @router.get("/health")
 def get_health(request: Request) -> dict[str, Any]:
     """Health check endpoint checking database integrity."""
     db: DatabaseManager = request.app.state.db
     is_healthy = db.is_healthy()
-    return {"status": "healthy" if is_healthy else "unhealthy", "db_healthy": is_healthy}
+    return {
+        "status": "healthy" if is_healthy else "unhealthy",
+        "db_healthy": is_healthy,
+        "api_auth_required": bool(settings.api_token),
+    }
 
 
 @router.get("/chats", response_model=list[ChatRecord])
@@ -87,6 +142,8 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
 
     from tg_cleaner.core.hashing import compute_dhash, compute_text_hash
 
+    if not settings.enable_demo_data:
+        raise HTTPException(status_code=404, detail="Demo data generation is disabled")
     db: DatabaseManager = request.app.state.db
     chat_id = 9999
     now = datetime.now(UTC)
@@ -100,7 +157,7 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
     db.upsert_chat(chat)
 
     # Generate a demo thumbnail image
-    thumbs_dir = Path("data") / "thumbs"
+    thumbs_dir = Path(request.app.state.thumb_dir)
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     img = Image.new("RGB", (320, 180), color=(14, 116, 144))
     draw = ImageDraw.Draw(img)
@@ -120,20 +177,20 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
             id=1,
             chat_id=chat_id,
             date=now.replace(hour=8, minute=0),
-            text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
-            raw_text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
+            text="Meeting notes: Architecture review for Telegram Archive Cleaner.",
+            raw_text="Meeting notes: Architecture review for Telegram Archive Cleaner.",
             text_hash=compute_text_hash(
-                "Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."
+                "Meeting notes: Architecture review for Telegram Archive Cleaner."
             ),
         ),
         MessageRecord(
             id=2,
             chat_id=chat_id,
             date=now.replace(hour=8, minute=15),
-            text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
-            raw_text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
+            text="Meeting notes: Architecture review for Telegram Archive Cleaner.",
+            raw_text="Meeting notes: Architecture review for Telegram Archive Cleaner.",
             text_hash=compute_text_hash(
-                "Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."
+                "Meeting notes: Architecture review for Telegram Archive Cleaner."
             ),
         ),
         MessageRecord(
@@ -206,41 +263,179 @@ async def import_desktop_export(
     request: Request,
     file: UploadFile | None = File(None),
 ) -> dict[str, Any]:
-    """Import chat and messages from Telegram Desktop JSON export."""
+    """Import a bounded single-chat or full Telegram Desktop JSON export."""
     db: DatabaseManager = request.app.state.db
+    max_bytes = max(1024, settings.max_import_bytes)
+
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > max_bytes + 2_000_000:
+        raise HTTPException(status_code=413, detail="Import payload exceeds configured size limit")
 
     if file:
-        content = await file.read()
+        content = bytearray()
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            content.extend(chunk)
+            if len(content) > max_bytes:
+                raise HTTPException(
+                    status_code=413, detail="Import file exceeds configured size limit"
+                )
         try:
-            export_dict = json.loads(content.decode("utf-8"))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON file: {e}") from e
+            export_dict = json.loads(bytes(content).decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid UTF-8 JSON export") from exc
     else:
+        body = await request.body()
+        if len(body) > max_bytes:
+            raise HTTPException(
+                status_code=413, detail="Import payload exceeds configured size limit"
+            )
         try:
-            export_dict = await request.json()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Missing JSON export payload") from None
+            export_dict = json.loads(body.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise HTTPException(
+                status_code=400, detail="Invalid or missing JSON export payload"
+            ) from exc
 
-    chat, messages = import_desktop_export_from_dict(export_dict, db)
-    return {
-        "chat_id": chat.id,
-        "title": chat.title,
-        "imported_count": len(messages),
+    try:
+        imported = import_desktop_export_payload(export_dict, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    messages_imported = sum(len(messages) for _, messages in imported)
+    response: dict[str, Any] = {
+        "chats_imported": len(imported),
+        "messages_imported": messages_imported,
+        "chat_ids": [chat.id for chat, _ in imported],
     }
+    if len(imported) == 1:
+        chat, messages = imported[0]
+        response.update(
+            {
+                "chat_id": chat.id,
+                "chat_title": chat.title,
+                # Backward-compatible names for existing API consumers.
+                "title": chat.title,
+                "imported_count": len(messages),
+            }
+        )
+    return response
 
 
 @router.get("/chats/{chat_id}/stats", response_model=ScanStats)
 def get_chat_stats(chat_id: int, request: Request) -> ScanStats:
     """Retrieve aggregate scan statistics for a chat."""
     db: DatabaseManager = request.app.state.db
+    if not db.get_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
     return db.get_scan_stats(chat_id)
 
 
-@router.get("/chats/{chat_id}/candidates", response_model=list[MessageRecord])
-def get_deletion_candidates(chat_id: int, request: Request) -> list[MessageRecord]:
-    """List all messages flagged as deletion candidates for a chat."""
+def _enriched_findings(
+    db: DatabaseManager, chat_id: int, *, only_candidates: bool
+) -> list[CandidateResponse]:
+    flags = db.get_flags_for_chat(chat_id)
+    if only_candidates:
+        flags = [flag for flag in flags if flag.is_candidate_for_deletion]
+    flags_by_message: dict[int, list[Any]] = {}
+    for flag in flags:
+        flags_by_message.setdefault(flag.message_id, []).append(flag)
+    messages = db.get_messages_by_ids(chat_id, list(flags_by_message))
+    messages = [message for message in messages if not message.is_deleted_locally]
+
+    enriched: list[CandidateResponse] = []
+    for message in sorted(messages, key=lambda item: item.date):
+        message_flags = flags_by_message.get(message.id, [])
+        if not message_flags:
+            continue
+        primary = message_flags[0]
+        eligible = any(flag.is_candidate_for_deletion for flag in message_flags)
+        enriched.append(
+            CandidateResponse(
+                **message.model_dump(),
+                flag_type=primary.flag_type,
+                recommended_for_deletion=eligible,
+                flag_types=[flag.flag_type for flag in message_flags],
+                group_id=primary.group_id,
+                confidence=max(flag.confidence for flag in message_flags),
+                reason=_flag_reason(primary.flag_type, primary.details),
+                flag_details=[
+                    {
+                        "flag_type": flag.flag_type.value,
+                        "group_id": flag.group_id,
+                        "confidence": flag.confidence,
+                        "recommended_for_deletion": flag.is_candidate_for_deletion,
+                        "details": flag.details,
+                    }
+                    for flag in message_flags
+                ],
+            )
+        )
+    return enriched
+
+
+@router.get("/chats/{chat_id}/findings", response_model=list[CandidateResponse])
+def get_review_findings(chat_id: int, request: Request) -> list[CandidateResponse]:
+    """Return all analysis results, including items that still need approval."""
     db: DatabaseManager = request.app.state.db
-    return db.get_deletion_candidates(chat_id)
+    if not db.get_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return _enriched_findings(db, chat_id, only_candidates=False)
+
+
+@router.get("/chats/{chat_id}/candidates", response_model=list[CandidateResponse])
+def get_deletion_candidates(chat_id: int, request: Request) -> list[CandidateResponse]:
+    """Return only findings currently authorized by a deterministic rule or user review."""
+    db: DatabaseManager = request.app.state.db
+    if not db.get_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return _enriched_findings(db, chat_id, only_candidates=True)
+
+
+class FindingEligibilityRequest(BaseModel):
+    """Explicit user approval/revocation for a review finding."""
+
+    eligible: bool
+
+
+@router.post("/chats/{chat_id}/findings/{message_id}/eligibility")
+def set_finding_eligibility(
+    chat_id: int, message_id: int, payload: FindingEligibilityRequest, request: Request
+) -> dict[str, Any]:
+    db: DatabaseManager = request.app.state.db
+    if not db.get_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    updated = db.set_message_deletion_eligibility(chat_id, message_id, payload.eligible)
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="No active finding exists for this message")
+    return {"chat_id": chat_id, "message_id": message_id, "eligible": payload.eligible}
+
+
+@router.get("/chats/{chat_id}/duplicate-groups")
+def list_duplicate_groups(chat_id: int, request: Request) -> list[dict[str, Any]]:
+    """Return complete duplicate groups, including keeper and candidate messages."""
+    db: DatabaseManager = request.app.state.db
+    all_flags = db.get_flags_for_chat(chat_id)
+    result: list[dict[str, Any]] = []
+    for group in db.get_duplicate_groups(chat_id):
+        messages = db.get_messages_by_ids(chat_id, group.message_ids)
+        flags = [flag for flag in all_flags if flag.group_id == group.id]
+        result.append(
+            {
+                "group_id": group.id,
+                "chat_id": group.chat_id,
+                "group_type": group.group_type.value,
+                "primary_message_id": group.primary_message_id,
+                "suggested_keep_id": group.primary_message_id,
+                "recommended_preset": group.recommended_preset.value,
+                "diff_summary": group.diff_summary,
+                "messages": [message.model_dump(mode="json") for message in messages],
+                "flags": [flag.model_dump(mode="json") for flag in flags],
+            }
+        )
+    return result
 
 
 @router.get("/groups/{group_id}/diff")
@@ -287,42 +482,68 @@ def update_group_preset(
 
 @router.post("/scan/{chat_id}", response_model=ScanResponse)
 async def scan_chat(chat_id: int, request: Request) -> ScanResponse:
-    """Run full audit pipeline (dedupe, links, policy, stale) on a chat."""
+    """Run the configured analyzers and return the persisted result count."""
     db: DatabaseManager = request.app.state.db
+    if not db.get_chat(chat_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
     client = getattr(request.app.state, "client", None)
 
-    db.clear_flags_for_chat(chat_id)
+    DeduplicationEngine(db).detect_duplicates_in_chat(chat_id)
+    PolicyAuditor(db).audit_chat_policy(chat_id)
+    await LinkHealthChecker(db, client=client).check_links_in_chat(chat_id)
+    StaleContentAnalyzer(db).audit_stale_content(chat_id, settings.stale_after_days)
 
-    # 1. Deduplication (Exact + Same Media Diff Caption)
-    dedupe_engine = DeduplicationEngine(db)
-    dedupe_flags = dedupe_engine.detect_duplicates_in_chat(chat_id)
+    if settings.enable_llm_analysis:
+        provider = settings.llm_provider.strip().lower()
+        api_key = settings.openai_api_key if provider == "openai" else settings.gemini_api_key
+        if api_key:
+            await SemanticLLMAnalyzer(
+                db, api_key=api_key, provider=provider, model=settings.llm_model
+            ).analyze_superseded_messages(chat_id)
 
-    # 2. Policy auditor
-    policy_auditor = PolicyAuditor(db)
-    policy_flags = policy_auditor.audit_chat_policy(chat_id)
-
-    # 3. Link health checker
-    link_checker = LinkHealthChecker(db, client=client)
-    link_flags = await link_checker.check_links_in_chat(chat_id)
-
-    # 4. Stale analyzer
-    stale_analyzer = StaleContentAnalyzer(db)
-    stale_flags = stale_analyzer.audit_stale_content(chat_id)
-
-    total_flags = len(dedupe_flags) + len(policy_flags) + len(link_flags) + len(stale_flags)
-    stats = db.get_scan_stats(chat_id)
-
-    return ScanResponse(chat_id=chat_id, flags_generated=total_flags, stats=stats)
+    flags_generated = len(db.get_flags_for_chat(chat_id))
+    return ScanResponse(
+        chat_id=chat_id, flags_generated=flags_generated, stats=db.get_scan_stats(chat_id)
+    )
 
 
 @router.post("/delete/{chat_id}", response_model=DeletionResult)
 async def delete_candidates(
     chat_id: int, payload: DeleteRequest, request: Request
 ) -> DeletionResult:
-    """Execute pre-deletion backup and paced deletion of candidate messages."""
+    """Back up and process only messages that are still current deletion candidates."""
     db: DatabaseManager = request.app.state.db
-    client = getattr(request.app.state, "client", None)
     backup_mgr: BackupManager = request.app.state.backup_manager
+
+    if not payload.message_ids:
+        raise HTTPException(status_code=400, detail="No messages selected")
+    if len(payload.message_ids) != len(set(payload.message_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate message IDs are not allowed")
+
+    allowed_ids = {message.id for message in db.get_deletion_candidates(chat_id)}
+    requested_ids = set(payload.message_ids)
+    rejected = sorted(requested_ids - allowed_ids)
+    if rejected:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Selection is stale or includes messages that are no longer deletion candidates",
+                "rejected_message_ids": rejected,
+            },
+        )
+
+    client = getattr(request.app.state, "client", None)
+    if not payload.dry_run and client is None:
+        from tg_cleaner.core.auth import TelegramAuthManager
+
+        auth = TelegramAuthManager()
+        if not await auth.is_authorized():
+            raise HTTPException(
+                status_code=401,
+                detail="Live deletion requires an authorized Telegram session",
+            )
+        client = auth.get_client()
+        request.app.state.client = client
 
     executor = DeletionExecutor(
         db=db,
@@ -338,8 +559,10 @@ async def delete_candidates(
             message_ids=payload.message_ids,
             dry_run=payload.dry_run,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/backups")
@@ -347,6 +570,28 @@ def list_backups(request: Request) -> list[dict[str, Any]]:
     """List all created backups with SHA-256 metadata."""
     backup_mgr: BackupManager = request.app.state.backup_manager
     return backup_mgr.list_backups()
+
+
+@router.get("/backups/{filename}/verify")
+def verify_backup_file(filename: str, request: Request) -> dict[str, Any]:
+    """Recompute a backup checksum and report whether the snapshot is valid."""
+    backup_mgr: BackupManager = request.app.state.backup_manager
+    safe_name = sanitize_filename(filename)
+    if safe_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid backup filename")
+    path = Path(backup_mgr.backup_dir) / safe_name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+
+    valid = backup_mgr.verify_backup(path)
+    sha256: str | None = None
+    try:
+        with open(path, encoding="utf-8") as file_handle:
+            sha256 = json.load(file_handle).get("sha256")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        valid = False
+
+    return {"valid": valid, "sha256": sha256, "filename": safe_name}
 
 
 @router.get("/backups/{chat_id}")
@@ -359,9 +604,9 @@ def list_chat_backups(chat_id: int, request: Request) -> list[dict[str, Any]]:
 class AuthSendCodeRequest(BaseModel):
     """Payload to request Telegram login code."""
 
-    phone: str
-    api_id: int | None = None
-    api_hash: str | None = None
+    phone: str = Field(min_length=5, max_length=32)
+    api_id: int | None = Field(default=None, gt=0)
+    api_hash: str | None = Field(default=None, min_length=16, max_length=128)
     proxy_type: str | None = None
     proxy_host: str | None = None
     proxy_port: int | None = None
@@ -373,18 +618,18 @@ class AuthSendCodeRequest(BaseModel):
 class AuthSignInRequest(BaseModel):
     """Payload to verify code and authenticate session."""
 
-    phone: str
-    code: str
-    phone_code_hash: str
-    password: str | None = None
+    phone: str = Field(min_length=5, max_length=32)
+    code: str = Field(min_length=1, max_length=16)
+    phone_code_hash: str = Field(min_length=8, max_length=256)
+    password: str | None = Field(default=None, max_length=512)
 
 
 class AuthCredentialsRequest(BaseModel):
     """Payload to configure and persist Telegram API credentials and proxy settings."""
 
-    api_id: int | None = None
-    api_hash: str | None = None
-    phone: str | None = None
+    api_id: int | None = Field(default=None, gt=0)
+    api_hash: str | None = Field(default=None, min_length=16, max_length=128)
+    phone: str | None = Field(default=None, min_length=5, max_length=32)
     proxy_type: str | None = None
     proxy_host: str | None = None
     proxy_port: int | None = None
@@ -424,11 +669,29 @@ async def get_auth_status(request: Request) -> dict[str, Any]:
         }
 
 
+async def _discard_app_client(request: Request) -> None:
+    """Safely disconnect and discard any active TelegramClient on app state."""
+    active = getattr(request.app.state, "client", None)
+    if active is not None:
+        disconnect = getattr(active, "disconnect", None)
+        if callable(disconnect):
+            try:
+                result = disconnect()
+                if hasattr(result, "__await__"):
+                    await result
+            except Exception:
+                pass
+        request.app.state.client = None
+
+
 @router.post("/auth/credentials")
-async def save_auth_credentials(payload: AuthCredentialsRequest) -> dict[str, Any]:
-    """Persist Telegram API credentials and proxy configuration to environment and memory."""
-    from tg_cleaner.core.auth import TelegramAuthManager
+async def save_auth_credentials(
+    payload: AuthCredentialsRequest, request: Request
+) -> dict[str, Any]:
+    """Persist Telegram API/proxy configuration and invalidate the active client."""
     from tg_cleaner.core.settings import update_credentials_and_save
+
+    await _discard_app_client(request)
 
     update_credentials_and_save(
         api_id=payload.api_id,
@@ -441,28 +704,28 @@ async def save_auth_credentials(payload: AuthCredentialsRequest) -> dict[str, An
         proxy_password=payload.proxy_password,
         proxy_secret=payload.proxy_secret,
     )
-    TelegramAuthManager().reset_client()
     return {"status": "ok"}
 
 
 @router.post("/auth/send-code")
-async def auth_send_code(payload: AuthSendCodeRequest) -> dict[str, Any]:
+async def auth_send_code(payload: AuthSendCodeRequest, request: Request) -> dict[str, Any]:
     """Request a login verification code via Telegram."""
     from tg_cleaner.core.auth import TelegramAuthManager
     from tg_cleaner.core.settings import settings, update_credentials_and_save
 
-    if payload.api_id or payload.api_hash or payload.proxy_host:
-        update_credentials_and_save(
-            api_id=payload.api_id,
-            api_hash=payload.api_hash,
-            phone=payload.phone,
-            proxy_type=payload.proxy_type,
-            proxy_host=payload.proxy_host,
-            proxy_port=payload.proxy_port,
-            proxy_username=payload.proxy_username,
-            proxy_password=payload.proxy_password,
-            proxy_secret=payload.proxy_secret,
-        )
+    await _discard_app_client(request)
+
+    update_credentials_and_save(
+        api_id=payload.api_id,
+        api_hash=payload.api_hash,
+        phone=payload.phone,
+        proxy_type=payload.proxy_type,
+        proxy_host=payload.proxy_host,
+        proxy_port=payload.proxy_port,
+        proxy_username=payload.proxy_username,
+        proxy_password=payload.proxy_password,
+        proxy_secret=payload.proxy_secret,
+    )
 
     if not settings.telegram_api_id or not settings.telegram_api_hash:
         raise HTTPException(
@@ -477,13 +740,16 @@ async def auth_send_code(payload: AuthSendCodeRequest) -> dict[str, Any]:
         return {"phone_code_hash": phone_code_hash}
     except Exception as e:
         msg = str(e)
-        if any(term in msg.lower() for term in ["timeout", "timed out", "connection", "connect", "refused"]):
+        if any(
+            term in msg.lower()
+            for term in ["timeout", "timed out", "connection", "connect", "refused"]
+        ):
             msg += ". If direct access to Telegram MTProto is blocked by your network provider, please configure a SOCKS5 or HTTP proxy in the proxy settings."
         raise HTTPException(status_code=400, detail=msg) from e
 
 
 @router.post("/auth/sign-in")
-async def auth_sign_in(payload: AuthSignInRequest) -> dict[str, Any]:
+async def auth_sign_in(payload: AuthSignInRequest, request: Request) -> dict[str, Any]:
     """Complete Telegram authentication with code and optional 2FA password."""
     try:
         from tg_cleaner.core.auth import TelegramAuthManager
@@ -495,38 +761,126 @@ async def auth_sign_in(payload: AuthSignInRequest) -> dict[str, Any]:
             phone_code_hash=payload.phone_code_hash,
             password=payload.password,
         )
+        request.app.state.client = auth.get_client()
         return {
             "success": True,
+            "status": "ok",
             "user_id": getattr(user, "id", None),
             "first_name": getattr(user, "first_name", "Telegram User"),
         }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as exc:
+        if "2fa password required" in str(exc).lower():
+            return {"success": False, "status": "2fa_required"}
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/auth/logout")
+async def auth_logout(request: Request) -> dict[str, Any]:
+    """Log out the current Telegram session and discard the in-process client."""
+    from tg_cleaner.core.auth import TelegramAuthManager
+
+    active = getattr(request.app.state, "client", None)
+    try:
+        if active is not None and callable(getattr(active, "log_out", None)):
+            await active.log_out()
+        else:
+            auth = TelegramAuthManager()
+            if await auth.is_authorized():
+                await auth.logout()
+    finally:
+        await _discard_app_client(request)
+    return {"status": "ok"}
+
+
+class LivePullRequest(BaseModel):
+    """Request to pull a live Telegram chat into the local staging database."""
+
+    chat: str = Field(min_length=1, max_length=256)
+    limit: int | None = Field(default=1000, ge=1, le=100000)
+
+
+async def _authorized_client(request: Request) -> Any:
+    client = getattr(request.app.state, "client", None)
+    if client is not None:
+        try:
+            if not client.is_connected():
+                await client.connect()
+            if await client.is_user_authorized():
+                return client
+        except Exception:
+            request.app.state.client = None
+
+    from tg_cleaner.core.auth import TelegramAuthManager
+
+    auth = TelegramAuthManager()
+    if not await auth.is_authorized():
+        raise HTTPException(status_code=401, detail="Telegram authorization required")
+    client = auth.get_client()
+    request.app.state.client = client
+    return client
+
+
+@router.get("/telegram/dialogs", response_model=list[ChatRecord])
+async def list_telegram_dialogs(request: Request, limit: int = 100) -> list[ChatRecord]:
+    """Fetch Telegram dialogs and refresh their local chat metadata."""
+    if limit < 1 or limit > 1000:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
+    client = await _authorized_client(request)
+    db: DatabaseManager = request.app.state.db
+    dialogs = await LiveIngestor(client, db, data_saver_mode=settings.data_saver_mode).list_dialogs(
+        limit
+    )
+    for chat in dialogs:
+        db.upsert_chat(chat)
+    return dialogs
+
+
+@router.post("/telegram/pull")
+async def pull_live_chat(payload: LivePullRequest, request: Request) -> dict[str, Any]:
+    """Resolve a Telegram peer and ingest its latest/full history into the staging DB."""
+    client = await _authorized_client(request)
+    try:
+        entity = await client.get_entity(payload.chat)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Telegram chat could not be resolved") from exc
+    db: DatabaseManager = request.app.state.db
+    ingestor = LiveIngestor(client, db, data_saver_mode=settings.data_saver_mode)
+    count = await ingestor.ingest_chat(entity, limit=payload.limit)
+    chat_id = None
+    try:
+        from telethon import utils
+
+        chat_id = int(utils.get_peer_id(entity))
+    except Exception:
+        chat_id = getattr(entity, "id", None)
+    return {"chat_id": chat_id, "messages_imported": count}
 
 
 @router.get("/media/{chat_id}/{message_id}")
 def get_media_thumbnail(chat_id: int, message_id: int, request: Request) -> Any:
-    """Serve cached image thumbnail or local media file if available."""
-    from pathlib import Path
+    """Serve only application-managed thumbnails for a known message.
 
-    from fastapi.responses import FileResponse
-
+    Desktop export ``file`` fields are untrusted input. Treating ``media_id`` as
+    an arbitrary filesystem path would turn the dashboard into a local-file read
+    primitive, so previews are restricted to the managed thumbnail cache.
+    """
     db: DatabaseManager = request.app.state.db
     messages = db.get_messages_by_ids(chat_id, [message_id])
     if not messages:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    msg = messages[0]
-    if msg.media_id:
-        media_path = Path(msg.media_id)
-        if media_path.is_file():
-            return FileResponse(str(media_path))
-
-    thumb_path = Path("data") / "thumbs" / f"{chat_id}_{message_id}.jpg"
+    thumb_root = Path(request.app.state.thumb_dir).resolve()
+    thumb_path = (thumb_root / f"{chat_id}_{message_id}.jpg").resolve()
+    try:
+        thumb_path.relative_to(thumb_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid media reference") from exc
     if thumb_path.is_file():
         return FileResponse(str(thumb_path))
 
-    raise HTTPException(status_code=404, detail="No media or thumbnail available")
+    raise HTTPException(status_code=404, detail="No managed thumbnail available")
 
 
 @router.get("/relay/status")
@@ -542,7 +896,6 @@ def get_relay_status() -> dict[str, Any]:
     )
     return {
         "configured": configured,
-        "relay_url": settings.relay_url if configured else None,
         "provider": provider_name,
     }
 
@@ -551,6 +904,8 @@ def get_relay_status() -> dict[str, Any]:
 def download_backup_file(filename: str, request: Request) -> Any:
     """Download a local pre-deletion JSON backup archive."""
     safe_name = sanitize_filename(filename)
+    if safe_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid backup filename")
     backup_mgr = getattr(request.app.state, "backup_manager", None)
     backup_dir = Path(backup_mgr.backup_dir) if backup_mgr else Path("backups")
     file_path = backup_dir / safe_name
@@ -564,12 +919,16 @@ def download_backup_file(filename: str, request: Request) -> Any:
 
 
 @router.post("/backups/{filename}/cloud-export")
-async def export_backup_to_cloud(filename: str, payload: CloudExportRequest) -> dict[str, Any]:
+async def export_backup_to_cloud(
+    filename: str, payload: CloudExportRequest, request: Request
+) -> dict[str, Any]:
     """Export a verified local backup archive to Google Drive or GitHub."""
     from tg_cleaner.cleaner.cloud_export import CloudExportManager
-    from tg_cleaner.core.settings import settings
 
-    manager = CloudExportManager(settings.backup_dir)
+    manager = CloudExportManager(request.app.state.backup_manager.backup_dir)
+    safe_name = sanitize_filename(filename)
+    if safe_name != filename:
+        raise HTTPException(status_code=400, detail="Invalid backup filename")
     if payload.provider == "github":
         if not payload.repo:
             raise HTTPException(
@@ -577,14 +936,14 @@ async def export_backup_to_cloud(filename: str, payload: CloudExportRequest) -> 
                 detail="GitHub repository ('owner/repo') is required for export",
             )
         res = await manager.export_to_github(
-            backup_filename=filename,
+            backup_filename=safe_name,
             token=payload.token,
             repo=payload.repo,
             branch=payload.branch,
         )
     elif payload.provider == "google_drive":
         res = await manager.export_to_google_drive(
-            backup_filename=filename,
+            backup_filename=safe_name,
             access_token=payload.token,
             folder_id=payload.folder_id,
         )

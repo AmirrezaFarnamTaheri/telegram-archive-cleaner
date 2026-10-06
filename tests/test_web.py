@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -202,3 +203,127 @@ def test_api_delete_dry_run(client: TestClient):
     # Verify 404 on nonexistent or path-traversal backup file
     missing_resp = client.get("/api/backups/download/nonexistent_backup.json")
     assert missing_resp.status_code == 404
+
+
+def test_api_candidates_include_review_evidence(client: TestClient):
+    """Candidate responses expose the flag metadata the review UI depends on."""
+    resp = client.get("/api/chats/100/candidates")
+    assert resp.status_code == 200
+    candidate = resp.json()[0]
+    assert candidate["id"] == 1
+    assert candidate["flag_type"] == "DUPLICATE_SAME_MEDIA_DIFF_CAPTION"
+    assert candidate["flag_types"] == ["DUPLICATE_SAME_MEDIA_DIFF_CAPTION"]
+    assert candidate["group_id"] == "grp_same_media_100"
+    assert candidate["reason"]
+    assert candidate["flag_details"][0]["confidence"] == 1.0
+
+
+def test_api_duplicate_groups_include_keeper(client: TestClient):
+    """Compare view receives the full group rather than deletion candidates only."""
+    resp = client.get("/api/chats/100/duplicate-groups")
+    assert resp.status_code == 200
+    groups = resp.json()
+    assert len(groups) == 1
+    assert groups[0]["group_id"] == "grp_same_media_100"
+    assert groups[0]["primary_message_id"] == 2
+    assert {m["id"] for m in groups[0]["messages"]} == {1, 2}
+
+
+def test_api_delete_rejects_stale_or_non_candidate_ids(client: TestClient):
+    """The API must not delete arbitrary message IDs supplied by the browser."""
+    resp = client.post(
+        "/api/delete/100",
+        json={"message_ids": [2], "dry_run": True},
+    )
+    assert resp.status_code == 409
+    assert "no longer deletion candidates" in resp.json()["detail"]["message"]
+
+
+def test_api_backup_verify_endpoint(client: TestClient):
+    """A created snapshot can be independently re-verified from the dashboard."""
+    created = client.post(
+        "/api/delete/100",
+        json={"message_ids": [1], "dry_run": True},
+    )
+    assert created.status_code == 200
+    filename = Path(created.json()["backup_file"]).name
+
+    verified = client.get(f"/api/backups/{filename}/verify")
+    assert verified.status_code == 200
+    assert verified.json()["valid"] is True
+    assert len(verified.json()["sha256"]) == 64
+
+
+def test_api_does_not_serve_archive_controlled_local_paths(web_db: DatabaseManager, tmp_path: Path):
+    """Desktop export file fields cannot be used as a local-file read primitive."""
+    secret = tmp_path / "secret.jpg"
+    secret.write_bytes(b"not really an image")
+    message = web_db.get_messages_by_ids(100, [1])[0]
+    message.media_id = str(secret)
+    web_db.upsert_messages([message])
+
+    app = create_app(db=web_db, backup_dir=str(tmp_path / "backups"))
+    local_client = TestClient(app)
+    resp = local_client.get("/api/media/100/1")
+    assert resp.status_code == 404
+    assert resp.content != secret.read_bytes()
+
+
+def test_api_token_protects_mutating_and_read_api(
+    web_db: DatabaseManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Configured API tokens protect the whole API while leaving the shell loadable."""
+    from tg_cleaner.core.settings import settings
+
+    monkeypatch.setattr(settings, "api_token", "test-secret-token")
+    app = create_app(db=web_db, backup_dir=str(tmp_path / "backups"))
+    protected_client = TestClient(app)
+
+    assert protected_client.get("/api/health").status_code == 401
+    authorized = protected_client.get(
+        "/api/health",
+        headers={"Authorization": "Bearer test-secret-token"},
+    )
+    assert authorized.status_code == 200
+    assert protected_client.get("/").status_code == 200
+
+
+def test_trusted_host_middleware_rejects_untrusted_host(
+    web_db: DatabaseManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Loopback-only host protection blocks DNS rebinding when API token is unset."""
+    from tg_cleaner.core.settings import settings
+
+    monkeypatch.setattr(settings, "api_token", "")
+    app = create_app(db=web_db, backup_dir=str(tmp_path / "backups"))
+    client = TestClient(app)
+
+    # Valid loopback host
+    resp_ok = client.get("/api/health", headers={"host": "localhost"})
+    assert resp_ok.status_code == 200
+
+    # Untrusted external host header (e.g. DNS rebinding)
+    resp_bad = client.get("/api/health", headers={"host": "evil.example.com"})
+    assert resp_bad.status_code == 400
+    assert "Invalid host header" in resp_bad.text
+
+
+@pytest.mark.asyncio
+async def test_auth_endpoints_discard_active_client(web_db: DatabaseManager, tmp_path: Path):
+    """Calling auth endpoints properly disconnects and discards active in-process client."""
+    mock_client = AsyncMock()
+    app = create_app(db=web_db, client=mock_client, backup_dir=str(tmp_path / "backups"))
+    client = TestClient(app)
+
+    # Calling save credentials should disconnect and discard active client
+    resp = client.post(
+        "/api/auth/credentials",
+        json={
+            "api_id": 12345,
+            "api_hash": "0123456789abcdef0123456789abcdef",
+            "phone": "+1234567890",
+        },
+    )
+    assert resp.status_code == 200
+    assert app.state.client is None
+    assert mock_client.disconnect.call_count == 1
