@@ -8,7 +8,7 @@ An intelligent, visual Telegram archive auditor and safety-first cleanup system.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 ### 1. Multi-Engine Deduplication & "Same Media / Different Captions"
 - **Exact & Fuzzy Deduplication**: Fast SHA-256 content hashing, token sort ratio fuzzy matching, and forwarded message chain tracking.
@@ -46,7 +46,7 @@ An intelligent, visual Telegram archive auditor and safety-first cleanup system.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Installation
 
@@ -88,9 +88,32 @@ TELEGRAM_SESSION_NAME=cleaner_session
 
 ---
 
-## 🖥️ Usage
+## Usage
 
-### Web Dashboard
+### Standalone Windows Executable (.exe)
+
+Telegram Archive Cleaner can run as a zero-dependency standalone Windows executable that bundles Python, FastAPI backend, deduplication engine, and web static assets:
+
+1. **Interactive Desktop GUI Mode**:
+   Double-click `TelegramArchiveCleaner.exe` in Windows Explorer (or run without arguments). It will start the embedded FastAPI server and automatically open your default browser to `http://127.0.0.1:8000`.
+
+2. **Command-Line Interface (CLI) Mode**:
+   Run the binary directly in PowerShell or cmd with any Typer CLI command:
+   ```powershell
+   .\TelegramArchiveCleaner.exe --help
+   .\TelegramArchiveCleaner.exe import path\to\result.json
+   .\TelegramArchiveCleaner.exe scan 123456789
+   .\TelegramArchiveCleaner.exe delete 123456789 --dry-run
+   ```
+
+3. **Building the Executable from Source**:
+   To compile the `.exe` locally using PyInstaller:
+   ```powershell
+   python scripts/build_exe.py
+   # Output binary located at dist/TelegramArchiveCleaner.exe
+   ```
+
+### Web Dashboard (Python Source)
 
 Start the local web dashboard:
 
@@ -121,7 +144,7 @@ tg-cleaner backups
 
 ---
 
-## 📁 Project Architecture
+## Project Architecture
 
 ```
 telegram-archive-cleaner/
@@ -149,7 +172,10 @@ telegram-archive-cleaner/
 │   │   └── static/              # Single-page application (Tailwind + Alpine.js)
 │   ├── cli.py                   # Typer CLI commands
 │   └── __main__.py              # Python module entry point
-├── tests/                       # Complete automated test suite (34 passing tests)
+├── scripts/
+│   └── build_exe.py             # PyInstaller standalone executable compilation script
+├── telegram-archive-cleaner.spec# PyInstaller one-file packaging specification
+├── tests/                       # Complete automated test suite (43 passing tests)
 ├── backups/                     # Directory for pre-deletion JSON snapshots
 ├── config/cloudflared/          # Cloudflare Tunnel configuration templates
 ├── Dockerfile                   # Multi-stage production container
@@ -159,7 +185,7 @@ telegram-archive-cleaner/
 
 ---
 
-## 🧪 Testing & Verification
+## Testing & Verification
 
 Run the comprehensive test suite with pytest:
 
@@ -170,12 +196,12 @@ pytest tests/ -v
 Check code quality with ruff:
 
 ```bash
-ruff check src tests
-ruff format --check src tests
+ruff check src tests scripts
+ruff format --check src tests scripts
 ```
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.

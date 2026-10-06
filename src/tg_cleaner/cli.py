@@ -31,13 +31,28 @@ def web(
     host: str = typer.Option(settings.web_host, help="Host to bind the web server to"),
     port: int = typer.Option(settings.web_port, help="Port to bind the web server to"),
     reload: bool = typer.Option(False, help="Enable auto-reload for development"),
+    open_browser: bool = typer.Option(
+        False, "--open-browser", help="Automatically launch default web browser"
+    ),
 ) -> None:
     """Launch the embedded FastAPI web dashboard."""
     db = DatabaseManager(settings.db_path)
     db.init_db()
 
     fastapi_app = create_app(db=db)
-    typer.echo(f"🚀 Starting Telegram Archive Cleaner dashboard at http://{host}:{port}")
+    typer.echo(f"Starting Telegram Archive Cleaner dashboard at http://{host}:{port}")
+
+    if open_browser:
+        import threading
+        import time
+        import webbrowser
+
+        def _open():
+            time.sleep(1.0)
+            webbrowser.open(f"http://{host}:{port}")
+
+        threading.Thread(target=_open, daemon=True).start()
+
     uvicorn.run(fastapi_app, host=host, port=port, reload=reload)
 
 
@@ -70,13 +85,17 @@ def sync(
 
     async def _run():
         if not await auth.is_authorized():
-            typer.secho("Not authorized. Run `tg-cleaner login` first.", fg=typer.colors.RED, err=True)
+            typer.secho(
+                "Not authorized. Run `tg-cleaner login` first.", fg=typer.colors.RED, err=True
+            )
             raise typer.Exit(code=1)
         ingestor = LiveIngestor(client, db)
         dialogs = await ingestor.list_dialogs(limit=limit)
         for d in dialogs:
             db.upsert_chat(d)
-        typer.secho(f"✅ Synced {len(dialogs)} dialogs into local database!", fg=typer.colors.GREEN)
+        typer.secho(
+            f"[OK] Synced {len(dialogs)} dialogs into local database!", fg=typer.colors.GREEN
+        )
 
     asyncio.run(_run())
 
@@ -94,10 +113,10 @@ def import_export(
     db = DatabaseManager(db_path)
     db.init_db()
 
-    typer.echo(f"📦 Importing Telegram export from {export_path}...")
+    typer.echo(f"Importing Telegram export from {export_path}...")
     result = parse_desktop_export_json(export_path, db)
     typer.secho(
-        f"✅ Imported {result['messages_imported']} messages into chat '{result['chat_title']}' (ID: {result['chat_id']})",
+        f"[OK] Imported {result['messages_imported']} messages into chat '{result['chat_title']}' (ID: {result['chat_id']})",
         fg=typer.colors.GREEN,
     )
 
@@ -120,7 +139,7 @@ def scan(
         )
         raise typer.Exit(code=1)
 
-    typer.echo(f"🔍 Running audit pipeline on chat '{chat.title}' (ID: {chat_id})...")
+    typer.echo(f"Running audit pipeline on chat '{chat.title}' (ID: {chat_id})...")
     db.clear_flags_for_chat(chat_id)
 
     # 1. Deduplication
@@ -141,7 +160,7 @@ def scan(
 
     stats = db.get_scan_stats(chat_id)
 
-    typer.secho("✅ Audit completed successfully!", fg=typer.colors.GREEN)
+    typer.secho("[OK] Audit completed successfully!", fg=typer.colors.GREEN)
     typer.echo(f"  • Total messages:            {stats.total_messages}")
     typer.echo(f"  • Exact duplicates:          {stats.exact_duplicates}")
     typer.echo(f"  • Same media / diff caption: {stats.same_media_diff_caption}")
@@ -171,7 +190,7 @@ def delete(
 
     candidate_ids = [m.id for m in candidates]
     mode_str = "DRY-RUN SIMULATION" if dry_run else "LIVE TELEGRAM DELETION"
-    typer.echo(f"🚀 Preparing {mode_str} for {len(candidate_ids)} messages in chat {chat_id}...")
+    typer.echo(f"Preparing {mode_str} for {len(candidate_ids)} messages in chat {chat_id}...")
 
     executor = DeletionExecutor(
         db=db, min_delay=0.01 if dry_run else 1.2, max_delay=0.02 if dry_run else 2.5
@@ -192,7 +211,7 @@ def delete(
 
     typer.echo("")
     typer.secho(
-        f"✅ {mode_str} completed! Processed: {result.deleted_count}/{result.total_candidates} messages.",
+        f"[OK] {mode_str} completed! Processed: {result.deleted_count}/{result.total_candidates} messages.",
         fg=typer.colors.GREEN,
     )
     typer.echo(f"   Backup snapshot verified at: {result.backup_file}")
@@ -223,8 +242,14 @@ def version() -> None:
 
 
 def main() -> None:
-    """Entry point for CLI execution."""
-    app()
+    """Entry point for CLI and standalone executable execution."""
+    import sys
+
+    if len(sys.argv) == 1:
+        # Standalone executable launch: default to launching web dashboard with browser
+        app(["web", "--open-browser"])
+    else:
+        app()
 
 
 if __name__ == "__main__":

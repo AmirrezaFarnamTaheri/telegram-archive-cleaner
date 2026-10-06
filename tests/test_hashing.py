@@ -23,7 +23,7 @@ def _create_synthetic_image(color: str, size: tuple[int, int] = (100, 100)) -> b
 
 def test_normalize_text_strips_unnecessary_characters():
     # Arrange
-    raw_input = "  \u200bHello\tWORLD!! \n\n🎉 123  "
+    raw_input = f"  \u200bHello\tWORLD!! \n\n{chr(0x1F389)} 123  "
     expected = "hello world!! 123"
 
     # Act

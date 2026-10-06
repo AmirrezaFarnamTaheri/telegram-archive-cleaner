@@ -92,9 +92,11 @@ class TelegramAuthManager:
         """Interactive terminal login flow."""
         target_phone = phone or settings.telegram_phone
         if not target_phone:
-            target_phone = typer.prompt("Enter your Telegram phone number (with country code, e.g. +1234567890)")
+            target_phone = typer.prompt(
+                "Enter your Telegram phone number (with country code, e.g. +1234567890)"
+            )
 
-        typer.echo(f"📲 Requesting login code for {target_phone}...")
+        typer.echo(f"Requesting login code for {target_phone}...")
         phone_code_hash = await self.send_login_code(target_phone)
 
         code = typer.prompt("Enter the verification code sent to your Telegram app")
@@ -104,9 +106,13 @@ class TelegramAuthManager:
         try:
             user = await self.sign_in_with_code(target_phone, code, phone_code_hash)
             name = getattr(user, "first_name", "Telegram User")
-            typer.secho(f"✅ Successfully logged in as {name}!", fg=typer.colors.GREEN)
+            typer.secho(f"[OK] Successfully logged in as {name}!", fg=typer.colors.GREEN)
         except SessionPasswordNeededError:
-            password = typer.prompt("Enter your 2FA Two-Step Verification Password", hide_input=True)
-            user = await self.sign_in_with_code(target_phone, code, phone_code_hash, password=password)
+            password = typer.prompt(
+                "Enter your 2FA Two-Step Verification Password", hide_input=True
+            )
+            user = await self.sign_in_with_code(
+                target_phone, code, phone_code_hash, password=password
+            )
             name = getattr(user, "first_name", "Telegram User")
-            typer.secho(f"✅ Successfully logged in as {name}!", fg=typer.colors.GREEN)
+            typer.secho(f"[OK] Successfully logged in as {name}!", fg=typer.colors.GREEN)

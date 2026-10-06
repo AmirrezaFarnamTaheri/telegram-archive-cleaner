@@ -191,3 +191,14 @@ def test_api_delete_dry_run(client: TestClient):
     assert b_resp.status_code == 200
     backups = b_resp.json()
     assert len(backups) >= 1
+
+    # Verify downloading the backup file
+    filename = backups[0]["filename"]
+    dl_resp = client.get(f"/api/backups/download/{filename}")
+    assert dl_resp.status_code == 200
+    assert "application/json" in dl_resp.headers["content-type"]
+    assert len(dl_resp.content) > 0
+
+    # Verify 404 on nonexistent or path-traversal backup file
+    missing_resp = client.get("/api/backups/download/nonexistent_backup.json")
+    assert missing_resp.status_code == 404

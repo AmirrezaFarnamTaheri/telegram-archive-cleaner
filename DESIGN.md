@@ -1,4 +1,4 @@
-# DESIGN.md — Telegram Archive Cleaner
+# DESIGN.md: Telegram Archive Cleaner
 
 ## Context (from discovery)
 

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import UTC
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from tg_cleaner.analyzer.dedupe import DeduplicationEngine
@@ -22,6 +24,7 @@ from tg_cleaner.core.models import (
     RetentionPreset,
     ScanStats,
 )
+from tg_cleaner.core.net_security import sanitize_filename
 from tg_cleaner.ingest.desktop_export import import_desktop_export_from_dict
 
 router = APIRouter(prefix="/api", tags=["cleaner"])
@@ -119,7 +122,9 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
             date=now.replace(hour=8, minute=0),
             text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
             raw_text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
-            text_hash=compute_text_hash("Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."),
+            text_hash=compute_text_hash(
+                "Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."
+            ),
         ),
         MessageRecord(
             id=2,
@@ -127,7 +132,9 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
             date=now.replace(hour=8, minute=15),
             text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
             raw_text="Meeting notes: Architecture review on Telegram Archive Cleaner pipeline.",
-            text_hash=compute_text_hash("Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."),
+            text_hash=compute_text_hash(
+                "Meeting notes: Architecture review on Telegram Archive Cleaner pipeline."
+            ),
         ),
         MessageRecord(
             id=3,
@@ -147,7 +154,9 @@ def generate_demo_chat(request: Request) -> dict[str, Any]:
             date=now.replace(hour=11, minute=30),
             text="Infographic: Distributed systems complete guide with full reference links & recommended reading list #notes #updated",
             raw_text="Infographic: Distributed systems complete guide with full reference links & recommended reading list #notes #updated",
-            text_hash=compute_text_hash("Infographic: Distributed systems complete guide with full reference links & recommended reading list #notes #updated"),
+            text_hash=compute_text_hash(
+                "Infographic: Distributed systems complete guide with full reference links & recommended reading list #notes #updated"
+            ),
             media_type="photo",
             media_id="photo_demo_banner_99",
             dhash=demo_dhash,
@@ -453,10 +462,24 @@ def get_relay_status() -> dict[str, Any]:
     }
 
 
+@router.get("/backups/download/{filename}")
+def download_backup_file(filename: str, request: Request) -> Any:
+    """Download a local pre-deletion JSON backup archive."""
+    safe_name = sanitize_filename(filename)
+    backup_mgr = getattr(request.app.state, "backup_manager", None)
+    backup_dir = Path(backup_mgr.backup_dir) if backup_mgr else Path("backups")
+    file_path = backup_dir / safe_name
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    return FileResponse(
+        str(file_path),
+        media_type="application/json",
+        filename=safe_name,
+    )
+
+
 @router.post("/backups/{filename}/cloud-export")
-async def export_backup_to_cloud(
-    filename: str, payload: CloudExportRequest
-) -> dict[str, Any]:
+async def export_backup_to_cloud(filename: str, payload: CloudExportRequest) -> dict[str, Any]:
     """Export a verified local backup archive to Google Drive or GitHub."""
     from tg_cleaner.cleaner.cloud_export import CloudExportManager
     from tg_cleaner.core.settings import settings
@@ -494,4 +517,3 @@ async def export_backup_to_cloud(
         "sha256": res.sha256,
         "bytes_uploaded": res.bytes_uploaded,
     }
-

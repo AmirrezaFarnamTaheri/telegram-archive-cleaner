@@ -85,12 +85,12 @@ async def test_cloud_export_google_drive(mock_db: DatabaseManager, tmp_path: Pat
     file_path = backup_mgr.create_backup(chat_id=200, message_ids=[1], db=mock_db)
 
     # Mock Drive session init
-    respx.post(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
-    ).mock(
+    respx.post("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable").mock(
         return_value=httpx.Response(
             200,
-            headers={"Location": "https://www.googleapis.com/upload/drive/v3/files?upload_id=session_xyz"},
+            headers={
+                "Location": "https://www.googleapis.com/upload/drive/v3/files?upload_id=session_xyz"
+            },
         )
     )
 

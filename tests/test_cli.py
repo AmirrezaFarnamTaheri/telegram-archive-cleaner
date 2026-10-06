@@ -62,3 +62,47 @@ def test_cli_import_and_scan_and_delete(tmp_path: Path):
     assert res_del.exit_code == 0
     assert "DRY-RUN SIMULATION completed" in res_del.stdout
     assert "Backup snapshot verified" in res_del.stdout
+
+
+def test_cli_main_dispatch(monkeypatch):
+    """Verify main() auto-launches web dashboard with browser when zero CLI args are provided."""
+    import sys
+    from unittest.mock import MagicMock
+
+    from tg_cleaner import cli
+
+    mock_app = MagicMock()
+    monkeypatch.setattr(cli, "app", mock_app)
+
+    # 1. Zero arguments provided -> standalone GUI launch
+    monkeypatch.setattr(sys, "argv", ["TelegramArchiveCleaner.exe"])
+    cli.main()
+    mock_app.assert_called_once_with(["web", "--open-browser"])
+
+    # 2. CLI arguments provided -> normal CLI dispatch
+    mock_app.reset_mock()
+    monkeypatch.setattr(sys, "argv", ["TelegramArchiveCleaner.exe", "version"])
+    cli.main()
+    mock_app.assert_called_once_with()
+
+
+def test_cli_get_static_dir(monkeypatch, tmp_path: Path):
+    """Verify get_static_dir handles frozen MEIPASS bundles and development paths."""
+    import sys
+
+    from tg_cleaner.web.app import get_static_dir
+
+    # 1. Normal development mode
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.delattr(sys, "_MEIPASS", raising=False)
+    static_dir = get_static_dir()
+    assert static_dir.name == "static"
+    assert (static_dir / "index.html").is_file()
+
+    # 2. Frozen mode with MEIPASS bundle structure
+    mock_bundle_static = tmp_path / "tg_cleaner" / "web" / "static"
+    mock_bundle_static.mkdir(parents=True)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    frozen_static_dir = get_static_dir()
+    assert frozen_static_dir == mock_bundle_static

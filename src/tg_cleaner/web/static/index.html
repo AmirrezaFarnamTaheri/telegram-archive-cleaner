@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telegram Archive Cleaner — Forensic Data Cockpit</title>
+  <title>Telegram Archive Cleaner: Forensic Data Cockpit</title>
   
   <!-- Modern Craft Typography: Plus Jakarta Sans + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,11 +78,14 @@
   </style>
 </head>
 <body 
-  class="bg-canvas text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500/30" 
+  class="bg-canvas text-slate-100 min-h-[100dvh] font-sans antialiased selection:bg-sky-500/30" 
   x-data="cleanerApp()" 
   x-init="init()" 
   x-cloak
 >
+
+  <!-- Skip to Main Content Link for Keyboard / Screen Readers -->
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-1.5 focus:bg-sky-600 focus:text-white focus:rounded focus:outline-none focus:ring-2 focus:ring-white text-xs font-mono">Skip to main content</a>
 
   <!-- Sticky Top Cockpit Bar -->
   <header role="banner" class="border-b border-borderSubtle bg-canvas/90 backdrop-blur-md sticky top-0 z-40 px-5 py-2.5 flex items-center justify-between">
@@ -174,7 +177,7 @@
   </header>
 
   <!-- Cockpit Work Environment -->
-  <div class="flex h-[calc(100vh-53px)]">
+  <div class="flex h-[calc(100dvh-53px)]">
     <!-- Left Navigation Sidebar (Collapsible) -->
     <aside 
       x-show="sidebarOpen" 
@@ -226,7 +229,7 @@
     </aside>
 
     <!-- Center Workspace -->
-    <main role="main" class="flex-1 flex flex-col overflow-y-auto bg-canvas p-4 sm:p-5 space-y-4">
+    <main id="main-content" role="main" class="flex-1 flex flex-col overflow-y-auto bg-canvas p-4 sm:p-5 space-y-4">
       
       <!-- Interactive Onboarding Quick-Start Guide -->
       <div 
@@ -539,15 +542,15 @@
               :disabled="page === 1"
               class="px-2.5 py-1 rounded bg-slate-900 border border-borderSubtle text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
-              ← Previous
+              Previous
             </button>
-            <span class="text-slate-400 text-[11px]" x-text="`Showing ${((page-1)*pageSize)+1}–${Math.min(page*pageSize, filteredCandidates().length)} of ${filteredCandidates().length}`"></span>
+            <span class="text-slate-400 text-[11px]" x-text="`Showing ${((page-1)*pageSize)+1} to ${Math.min(page*pageSize, filteredCandidates().length)} of ${filteredCandidates().length}`"></span>
             <button 
               @click="nextPage()" 
               :disabled="page === totalPages()"
               class="px-2.5 py-1 rounded bg-slate-900 border border-borderSubtle text-slate-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
             >
-              Next →
+              Next
             </button>
           </div>
         </div>
@@ -666,12 +669,25 @@
                     </td>
                     <td class="p-3 text-slate-400 font-mono tabular-nums" x-text="formatBytes(b.size_bytes)"></td>
                     <td class="p-3 text-right">
-                      <button 
-                        @click="openCloudExport(b)" 
-                        class="px-2.5 py-1 text-xs font-mono rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-700/60 text-sky-300 transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
-                      >
-                        Export Offsite
-                      </button>
+                      <div class="flex items-center justify-end space-x-2">
+                        <a 
+                          :href="`/api/backups/download/${encodeURIComponent(b.filename)}`" 
+                          download
+                          class="px-2.5 py-1 text-xs font-mono rounded bg-slate-900 hover:bg-slate-800 border border-borderSubtle text-slate-200 transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none inline-flex items-center space-x-1"
+                          title="Download Snapshot JSON"
+                        >
+                          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          <span>Download</span>
+                        </a>
+                        <button 
+                          @click="openCloudExport(b)" 
+                          class="px-2.5 py-1 text-xs font-mono rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-700/60 text-sky-300 transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
+                        >
+                          Export Offsite
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </template>
@@ -690,11 +706,11 @@
   </div>
 
   <!-- Modal: Import Desktop Archive -->
-  <div x-show="showImportModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showImportModal" role="dialog" aria-modal="true" aria-labelledby="importModalTitle" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-lg w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
-          <h3 class="text-sm font-bold text-white">Import Telegram Desktop JSON</h3>
+          <h3 id="importModalTitle" class="text-sm font-bold text-white">Import Telegram Desktop JSON</h3>
           <p class="text-xs text-slate-400">Offline ingestion of <code class="text-sky-300 font-mono">result.json</code> archives</p>
         </div>
         <button @click="showImportModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
@@ -714,11 +730,11 @@
   </div>
 
   <!-- Modal: Batch Deletion Confirmation -->
-  <div x-show="showDeleteModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showDeleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
-          <h3 class="text-sm font-bold text-white">Execute Deletion Batch</h3>
+          <h3 id="deleteModalTitle" class="text-sm font-bold text-white">Execute Deletion Batch</h3>
           <p class="text-xs text-slate-400">Zero data loss safety protocol enforced</p>
         </div>
         <button @click="showDeleteModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
@@ -770,11 +786,11 @@
   </div>
 
   <!-- Modal: MTProto Authentication -->
-  <div x-show="showAuthModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showAuthModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
-          <h3 class="text-sm font-bold text-white">Telegram MTProto Connection</h3>
+          <h3 id="authModalTitle" class="text-sm font-bold text-white">Telegram MTProto Connection</h3>
           <p class="text-xs text-slate-400">Direct client protocol authentication</p>
         </div>
         <button @click="showAuthModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
@@ -872,11 +888,11 @@
   </div>
 
   <!-- Modal: Offsite Cloud Backup Export -->
-  <div x-show="showCloudExportModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showCloudExportModal" role="dialog" aria-modal="true" aria-labelledby="cloudExportModalTitle" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
-          <h3 class="text-sm font-bold text-white">Offsite Snapshot Export</h3>
+          <h3 id="cloudExportModalTitle" class="text-sm font-bold text-white">Offsite Snapshot Export</h3>
           <p class="text-xs text-slate-400">Stream verified archive to offsite cloud repository</p>
         </div>
         <button @click="showCloudExportModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">
@@ -952,10 +968,10 @@
   </div>
 
   <!-- Modal: Media Visual Lightbox Inspection -->
-  <div x-show="showMediaModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+  <div x-show="showMediaModal" role="dialog" aria-modal="true" aria-labelledby="mediaModalTitle" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-2xl w-full p-5 space-y-3 shadow-2xl">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2" id="mediaModalTitle">
           <span class="text-xs font-bold text-white font-mono" x-text="`Media #${inspectMediaId}`"></span>
           <span class="text-xs text-slate-400 truncate max-w-md" x-text="inspectMediaTitle"></span>
         </div>
@@ -978,11 +994,11 @@
   </div>
 
   <!-- Modal: Keyboard Shortcuts Guide -->
-  <div x-show="showShortcutsModal" role="dialog" aria-modal="true" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div x-show="showShortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-surface border border-borderSubtle rounded-lg max-w-md w-full p-5 space-y-4 shadow-2xl font-mono text-xs">
       <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
         <div>
-          <h3 class="text-sm font-bold text-white font-sans">Keyboard Navigation</h3>
+          <h3 id="shortcutsModalTitle" class="text-sm font-bold text-white font-sans">Keyboard Navigation</h3>
           <p class="text-slate-400 text-[11px]">Cockpit productivity shortcuts</p>
         </div>
         <button @click="showShortcutsModal = false" aria-label="Close Modal" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">

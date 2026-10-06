@@ -13,7 +13,7 @@
    - Telethon MTProto User Session provides 100% lifetime read/write access to Saved Messages, channel history via `client.iter_messages`, and low-level flags like `restriction_reason` and `fwd_from`.
 2. **Deletion Mechanics & FloodWaits:**
    - Both `channels.deleteMessages` and `messages.deleteMessages` accept up to **100 message IDs** per RPC call.
-   - Safe pacing profile: 50–100 messages per call with 1.2s – 2.5s jittered delay.
+   - Safe pacing profile: 50-100 messages per call with 1.2s - 2.5s jittered delay.
    - On `FloodWaitError`, Telethon provides `e.seconds`. The cleaner must pause for `e.seconds + 1` before resuming.
 3. **Telegram Chat Invite Link Validation:**
    - Invites in format `t.me/+<hash>` or `t.me/joinchat/<hash>` can be inspected without joining via `telethon.functions.messages.CheckChatInviteRequest(hash=...)`.

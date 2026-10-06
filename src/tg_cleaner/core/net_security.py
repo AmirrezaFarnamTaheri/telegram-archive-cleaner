@@ -12,14 +12,16 @@ import re
 import socket
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-RESERVED_EDGE_HOSTS: frozenset[str] = frozenset({
-    "localhost",
-    "localhost.",
-    "metadata.google.internal",
-    "metadata.google.internal.",
-    "instance-data.ec2.internal",
-    "instance-data.ec2.internal.",
-})
+RESERVED_EDGE_HOSTS: frozenset[str] = frozenset(
+    {
+        "localhost",
+        "localhost.",
+        "metadata.google.internal",
+        "metadata.google.internal.",
+        "instance-data.ec2.internal",
+        "instance-data.ec2.internal.",
+    }
+)
 
 RESERVED_EDGE_SUFFIXES: tuple[str, ...] = (
     ".localhost",
