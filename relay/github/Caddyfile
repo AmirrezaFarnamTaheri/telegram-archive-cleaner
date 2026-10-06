@@ -1,0 +1,9 @@
+{$RELAY_DOMAIN} {
+  reverse_proxy worker:8789 {
+    flush_interval -1
+  }
+
+  header {
+    -Server
+  }
+}

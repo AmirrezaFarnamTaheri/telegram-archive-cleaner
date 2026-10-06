@@ -1,0 +1,17 @@
+# Example Cloudflare Tunnel Configuration
+# Tunneling Telegram Archive Cleaner through Cloudflare edge network
+# Saves local data consumption and exposes the dashboard securely over HTTPS.
+
+tunnel: your-tunnel-id-here
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Route public hostname to the local/container FastAPI dashboard
+  - hostname: cleaner.yourdomain.com
+    service: http://localhost:8000
+    originRequest:
+      connectTimeout: 30s
+      noTLSVerify: true
+  
+  # Catch-all rule (required by Cloudflare Tunnel)
+  - service: http_status:404

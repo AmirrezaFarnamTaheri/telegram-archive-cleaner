@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Archive Cleaner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .diff-del { background-color: #fee2e2; color: #991b1b; text-decoration: line-through; padding: 0 2px; border-radius: 2px; }
+    .diff-ins { background-color: #dcfce7; color: #166534; font-weight: 600; padding: 0 2px; border-radius: 2px; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans" x-data="cleanerApp()" x-init="init()" x-cloak>
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
+        TG
+      </div>
+      <div>
+        <h1 class="text-lg font-semibold tracking-tight text-white">Telegram Archive Cleaner</h1>
+        <p class="text-xs text-slate-400">Intelligent visual deduplication, link health & safety-first deletion</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="inline-block w-2.5 h-2.5 rounded-full" :class="dbHealthy ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+        <span class="text-slate-300" x-text="dbHealthy ? 'Database Active' : 'DB Offline'"></span>
+      </div>
+      <div class="flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border" :class="relayConfigured ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-slate-800/60 border-slate-700/60 text-slate-400'">
+        <span class="w-1.5 h-1.5 rounded-full" :class="relayConfigured ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+        <span x-text="relayConfigured ? 'Relay Active (' + relayProvider + ')' : 'Direct Network'"></span>
+      </div>
+      <button @click="showAuthModal = true" class="px-3 py-1.5 text-xs font-medium rounded-md border transition flex items-center space-x-1.5" :class="telegramAuth ? 'bg-emerald-950/40 border-emerald-700 text-emerald-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'">
+        <span class="w-2 h-2 rounded-full" :class="telegramAuth ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+        <span x-text="telegramAuth ? 'Telegram Connected' : 'Connect Telegram'"></span>
+      </button>
+      <button @click="showImportModal = true" class="px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        Import Desktop Export
+      </button>
+      <button @click="refreshAll()" class="px-3 py-1.5 text-xs font-medium rounded-md bg-sky-600 hover:bg-sky-500 text-white transition flex items-center space-x-1">
+        <span>Refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex h-[calc(100vh-69px)]">
+    <!-- Left Sidebar: Chat Selection -->
+    <aside class="w-72 border-r border-slate-800 bg-slate-950/40 p-4 flex flex-col space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Chats & Channels</h2>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300" x-text="chats.length"></span>
+      </div>
+
+      <button @click="generateDemoData()" class="w-full py-2 px-3 text-xs font-medium rounded-lg bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 text-sky-300 transition flex items-center justify-center space-x-1.5">
+        <span>⚡ Load Interactive Demo Data</span>
+      </button>
+
+      <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <template x-for="chat in chats" :key="chat.id">
+          <div 
+            @click="selectChat(chat)" 
+            class="p-3 rounded-lg border cursor-pointer transition flex flex-col space-y-1"
+            :class="selectedChat?.id === chat.id ? 'bg-sky-950/40 border-sky-500/50 text-white' : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 text-slate-300'"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-medium text-sm truncate" x-text="chat.title"></span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 uppercase" x-text="chat.chat_type"></span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span x-text="`${chat.total_messages} msgs`"></span>
+              <span x-text="chat.last_scanned ? 'Audited' : 'Unscanned'"></span>
+            </div>
+          </div>
+        </template>
+        <div x-show="chats.length === 0" class="text-xs text-slate-500 text-center py-8">
+          No chats loaded yet.<br>Click "Import Desktop Export" to load Telegram JSON.
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex flex-col overflow-y-auto bg-slate-900 p-6 space-y-6">
+      <div x-show="!selectedChat" class="text-center py-24 text-slate-500">
+        <div class="text-4xl mb-3">📁</div>
+        <p class="text-sm">Select a chat from the sidebar or import a Telegram Desktop export to begin.</p>
+      </div>
+
+      <div x-show="selectedChat" class="space-y-6">
+        <!-- Chat Overview Header -->
+        <div class="flex items-center justify-between bg-slate-950/60 p-5 rounded-xl border border-slate-800">
+          <div>
+            <div class="flex items-center space-x-2">
+              <h2 class="text-xl font-bold text-white" x-text="selectedChat?.title"></h2>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-sky-900/50 text-sky-300 border border-sky-800/50" x-text="selectedChat?.chat_type"></span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1" x-text="`Chat ID: ${selectedChat?.id} • Total Messages: ${stats?.total_messages || 0}`"></p>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <button 
+              @click="runScan()" 
+              :disabled="scanning"
+              class="px-4 py-2 text-sm font-medium rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center space-x-2 disabled:opacity-50"
+            >
+              <svg x-show="scanning" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+              <span x-text="scanning ? 'Auditing chat...' : 'Run Full Audit'"></span>
+            </button>
+
+            <button 
+              @click="showDeleteModal = true"
+              :disabled="selectedCandidateIds.length === 0"
+              class="px-4 py-2 text-sm font-medium rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition flex items-center space-x-1 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <span>Batch Delete (<span x-text="selectedCandidateIds.length"></span>)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div class="bg-slate-950/40 border border-slate-800 p-3.5 rounded-lg">
+            <div class="text-[11px] text-slate-400 uppercase font-medium">Messages</div>
+            <div class="text-xl font-bold text-slate-100 mt-1" x-text="stats?.total_messages || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-slate-800 p-3.5 rounded-lg">
+            <div class="text-[11px] text-slate-400 uppercase font-medium">Exact Dupes</div>
+            <div class="text-xl font-bold text-amber-400 mt-1" x-text="stats?.exact_duplicates || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-sky-900/50 bg-sky-950/10 p-3.5 rounded-lg">
+            <div class="text-[11px] text-sky-400 uppercase font-medium">Same Media Diff</div>
+            <div class="text-xl font-bold text-sky-300 mt-1" x-text="stats?.same_media_diff_caption || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-slate-800 p-3.5 rounded-lg">
+            <div class="text-[11px] text-slate-400 uppercase font-medium">Dead Links</div>
+            <div class="text-xl font-bold text-rose-400 mt-1" x-text="stats?.dead_links || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-slate-800 p-3.5 rounded-lg">
+            <div class="text-[11px] text-slate-400 uppercase font-medium">Policy Flags</div>
+            <div class="text-xl font-bold text-purple-400 mt-1" x-text="stats?.policy_restricted || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-rose-900/50 bg-rose-950/10 p-3.5 rounded-lg">
+            <div class="text-[11px] text-rose-400 uppercase font-medium">Candidates</div>
+            <div class="text-xl font-bold text-rose-300 mt-1" x-text="stats?.total_deletion_candidates || 0"></div>
+          </div>
+          <div class="bg-slate-950/40 border border-slate-800 p-3.5 rounded-lg">
+            <div class="text-[11px] text-slate-400 uppercase font-medium">Reclaimable</div>
+            <div class="text-xl font-bold text-emerald-400 mt-1" x-text="formatBytes(stats?.estimated_reclaimable_bytes || 0)"></div>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="border-b border-slate-800 flex items-center space-x-6 text-sm font-medium">
+          <button @click="activeTab = 'candidates'" :class="activeTab === 'candidates' ? 'text-sky-400 border-b-2 border-sky-400 pb-3' : 'text-slate-400 hover:text-slate-200 pb-3'">
+            Deletion Candidates (<span x-text="candidates.length"></span>)
+          </button>
+          <button @click="activeTab = 'diffs'" :class="activeTab === 'diffs' ? 'text-sky-400 border-b-2 border-sky-400 pb-3' : 'text-slate-400 hover:text-slate-200 pb-3'">
+            Same Media / Diff Caption Groups (<span x-text="diffGroups.length"></span>)
+          </button>
+          <button @click="activeTab = 'backups'" :class="activeTab === 'backups' ? 'text-sky-400 border-b-2 border-sky-400 pb-3' : 'text-slate-400 hover:text-slate-200 pb-3'">
+            Backups Archive (<span x-text="backups.length"></span>)
+          </button>
+        </div>
+
+        <!-- TAB 1: Deletion Candidates List -->
+        <div x-show="activeTab === 'candidates'" class="space-y-4">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <div class="flex items-center space-x-3">
+              <button @click="selectAllCandidates()" class="hover:text-white underline">Select All</button>
+              <span>•</span>
+              <button @click="deselectAllCandidates()" class="hover:text-white underline">Deselect All</button>
+            </div>
+            <span x-text="`${selectedCandidateIds.length} candidate(s) selected`"></span>
+          </div>
+
+          <div class="space-y-2">
+            <template x-for="cand in candidates" :key="cand.id">
+              <div class="p-3.5 rounded-lg border border-slate-800 bg-slate-950/30 flex items-start space-x-3 hover:border-slate-700 transition">
+                <input type="checkbox" :value="cand.id" x-model="selectedCandidateIds" class="mt-1 rounded bg-slate-800 border-slate-700 text-sky-600 focus:ring-0">
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono text-slate-400" x-text="`Msg #${cand.id} • ${formatDate(cand.date)}`"></span>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800" x-text="cand.media_type ? cand.media_type.toUpperCase() : 'TEXT'"></span>
+                  </div>
+                  <p class="text-sm text-slate-200 mt-1 line-clamp-2" x-text="cand.text || '[No caption]'"></p>
+                </div>
+              </div>
+            </template>
+            <div x-show="candidates.length === 0" class="text-center py-12 text-slate-500 text-sm">
+              No deletion candidates found for this chat. Run a full audit above!
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Same Media / Diff Caption Comparison Cards -->
+        <div x-show="activeTab === 'diffs'" class="space-y-6">
+          <template x-for="grp in diffGroups" :key="grp.group_id">
+            <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-white">Same Media Group: <span class="font-mono text-xs text-sky-400" x-text="grp.group_id"></span></h3>
+                  <p class="text-xs text-slate-400">Identical media hash with modified captions or reschedule announcements</p>
+                </div>
+                <!-- Retention Preset Selector -->
+                <div class="flex items-center space-x-2">
+                  <label class="text-xs text-slate-400 font-medium">Preset:</label>
+                  <select 
+                    @change="setGroupPreset(grp.group_id, $event.target.value)" 
+                    class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="KEEP_NEWEST">Keep Newest (Default)</option>
+                    <option value="KEEP_LONGEST">Keep Longest (Richest)</option>
+                    <option value="KEEP_OLDEST">Keep Oldest (Original)</option>
+                    <option value="WHITELIST_ALL">Whitelist All (Keep Both)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Side-by-Side Comparison -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <template x-for="msg in grp.messages" :key="msg.id">
+                  <div 
+                    class="p-4 rounded-lg border flex flex-col justify-between"
+                    :class="grp.suggested_keep_id === msg.id ? 'border-emerald-600/50 bg-emerald-950/10' : 'border-rose-600/40 bg-rose-950/10'"
+                  >
+                    <div>
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-mono text-slate-400" x-text="`ID #${msg.id} • ${formatDate(msg.date)}`"></span>
+                        <span 
+                          class="text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase"
+                          :class="grp.suggested_keep_id === msg.id ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700' : 'bg-rose-900/60 text-rose-300 border border-rose-700'"
+                          x-text="grp.suggested_keep_id === msg.id ? 'KEEP (Preserved)' : 'CANDIDATE (Delete)'"
+                        ></span>
+                      </div>
+                      <img 
+                        :src="`/api/media/${selectedChat.id}/${msg.id}`" 
+                        @error="$el.style.display='none'" 
+                        class="w-full max-h-48 object-cover rounded mb-2 border border-slate-800"
+                        alt="Media Preview"
+                      >
+                      <div class="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/60 p-2.5 rounded border border-slate-800" x-text="msg.text || '[No caption]'"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div x-show="diffGroups.length === 0" class="text-center py-12 text-slate-500 text-sm">
+            No Same-Media Different-Caption duplicate clusters detected.
+          </div>
+        </div>
+
+        <!-- TAB 3: Backups Archive -->
+        <div x-show="activeTab === 'backups'" class="space-y-4">
+          <div class="text-xs text-slate-400">Pre-deletion snapshots created automatically with SHA-256 integrity verification.</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border border-slate-800 rounded-lg overflow-hidden">
+              <thead class="bg-slate-950 text-slate-400 uppercase font-medium">
+                <tr>
+                  <th class="p-3">Filename</th>
+                  <th class="p-3">Created</th>
+                  <th class="p-3">Messages</th>
+                  <th class="p-3">SHA-256 Checksum</th>
+                  <th class="p-3">Size</th>
+                  <th class="p-3 text-right">Offsite Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 bg-slate-900/50">
+                <template x-for="b in backups" :key="b.path">
+                  <tr>
+                    <td class="p-3 font-mono text-sky-400" x-text="b.filename"></td>
+                    <td class="p-3 text-slate-300" x-text="formatDate(b.created_at)"></td>
+                    <td class="p-3 text-slate-300 font-semibold" x-text="b.message_count"></td>
+                    <td class="p-3 font-mono text-slate-400 truncate max-w-xs" x-text="b.sha256"></td>
+                    <td class="p-3 text-slate-400" x-text="formatBytes(b.size_bytes)"></td>
+                    <td class="p-3 text-right">
+                      <button 
+                        @click="openCloudExport(b)" 
+                        class="px-2.5 py-1 text-xs font-medium rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-700/60 text-sky-300 transition"
+                      >
+                        Export to Cloud
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="backups.length === 0">
+                  <td colspan="6" class="p-6 text-center text-slate-500">No pre-deletion backups recorded yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Import Desktop Export -->
+  <div x-show="showImportModal" class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Import Telegram Desktop Export</h3>
+        <button @click="showImportModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400">Select the exported <code class="text-sky-300">result.json</code> file from Telegram Desktop (Settings → Advanced → Export Telegram data → JSON format).</p>
+      
+      <div class="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-sky-500 transition cursor-pointer">
+        <input type="file" accept=".json" @change="handleFileUpload($event)" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500">
+      </div>
+
+      <div class="flex justify-end space-x-2">
+        <button @click="showImportModal = false" class="px-4 py-2 text-xs rounded-md bg-slate-800 text-slate-300">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Batch Deletion Execution -->
+  <div x-show="showDeleteModal" class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Confirm Batch Deletion</h3>
+        <button @click="showDeleteModal = false" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+
+      <div class="bg-amber-950/30 border border-amber-800/60 p-3.5 rounded-lg text-xs text-amber-200 space-y-1">
+        <div class="font-semibold">⚠️ Safety Protocol Enforced</div>
+        <p>A full JSON backup verified by SHA-256 will be written to the local <code class="text-white font-mono">backups/</code> directory before any deletion begins.</p>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between text-xs text-slate-300">
+          <span>Target Messages:</span>
+          <span class="font-bold text-white" x-text="selectedCandidateIds.length"></span>
+        </div>
+
+        <label class="flex items-center space-x-2 p-3 bg-slate-950 rounded-lg border border-slate-800 cursor-pointer">
+          <input type="checkbox" x-model="dryRunMode" class="rounded bg-slate-800 border-slate-700 text-sky-500">
+          <div>
+            <div class="text-xs font-semibold text-white">Dry-Run Simulation Mode</div>
+            <div class="text-[11px] text-slate-400">Verifies backup & simulates deletion without contacting Telegram</div>
+          </div>
+        </label>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button @click="showDeleteModal = false" class="px-4 py-2 text-xs rounded-md bg-slate-800 text-slate-300">Cancel</button>
+        <button 
+          @click="executeBatchDelete()" 
+          :disabled="deleting"
+          class="px-4 py-2 text-xs font-semibold rounded-md bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
+        >
+          <span x-text="deleting ? 'Executing...' : (dryRunMode ? 'Run Simulation' : 'Execute Deletion')"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Telegram MTProto Authentication -->
+  <div x-show="showAuthModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-white">Connect Telegram Session</h3>
+          <p class="text-xs text-slate-400">Direct MTProto authentication for live chat synchronization</p>
+        </div>
+        <button @click="showAuthModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">&times;</button>
+      </div>
+
+      <!-- Step 1: Phone Entry -->
+      <div x-show="authStep === 'phone'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Phone Number (International format)</label>
+          <input 
+            type="tel" 
+            x-model="authPhone" 
+            placeholder="+1234567890" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-sky-500 font-mono"
+            @keydown.enter="sendAuthCode()"
+          >
+          <p class="text-[11px] text-slate-400 mt-1">A login verification code will be sent to your official Telegram app.</p>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button @click="showAuthModal = false" class="px-3.5 py-1.5 text-xs rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+          <button 
+            @click="sendAuthCode()" 
+            :disabled="authLoading || !authPhone"
+            class="px-4 py-1.5 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 transition flex items-center space-x-1.5"
+          >
+            <span x-show="authLoading" class="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full mr-1"></span>
+            <span x-text="authLoading ? 'Requesting Code...' : 'Send Verification Code'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Verification Code -->
+      <div x-show="authStep === 'code'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Telegram Login Code</label>
+          <input 
+            type="text" 
+            x-model="authCode" 
+            placeholder="12345" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white tracking-widest text-center focus:outline-none focus:border-sky-500 font-mono text-lg font-bold"
+            @keydown.enter="completeSignIn()"
+          >
+          <p class="text-[11px] text-slate-400 mt-1">Enter the 5-digit security code received in your Telegram chat.</p>
+        </div>
+        <div class="flex justify-between items-center pt-2">
+          <button @click="authStep = 'phone'" class="text-xs text-slate-400 hover:text-slate-200">← Back to Phone</button>
+          <div class="flex space-x-2">
+            <button @click="showAuthModal = false" class="px-3.5 py-1.5 text-xs rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+            <button 
+              @click="completeSignIn()" 
+              :disabled="authLoading || !authCode"
+              class="px-4 py-1.5 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition flex items-center space-x-1.5"
+            >
+              <span x-show="authLoading" class="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full mr-1"></span>
+              <span x-text="authLoading ? 'Verifying...' : 'Complete Sign In'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Two-Factor Password -->
+      <div x-show="authStep === 'password'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Two-Factor Authentication Password</label>
+          <input 
+            type="password" 
+            x-model="authPassword" 
+            placeholder="Account Password" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-sky-500"
+            @keydown.enter="completeSignIn()"
+          >
+          <p class="text-[11px] text-slate-400 mt-1">Your Telegram account has cloud 2FA password protection enabled.</p>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button @click="showAuthModal = false" class="px-3.5 py-1.5 text-xs rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+          <button 
+            @click="completeSignIn()" 
+            :disabled="authLoading || !authPassword"
+            class="px-4 py-1.5 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition flex items-center space-x-1.5"
+          >
+            <span x-show="authLoading" class="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full mr-1"></span>
+            <span x-text="authLoading ? 'Authenticating...' : 'Submit 2FA Password'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Offsite Cloud Backup Export -->
+  <div x-show="showCloudExportModal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-white">Export Backup to Cloud</h3>
+          <p class="text-xs text-slate-400">Stream verified JSON archive to offsite cloud storage</p>
+        </div>
+        <button @click="showCloudExportModal = false" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition">&times;</button>
+      </div>
+
+      <div class="bg-slate-950 p-3 rounded-lg border border-slate-800/80 space-y-1 text-xs font-mono">
+        <div class="text-slate-400">Target Snapshot:</div>
+        <div class="text-sky-400 truncate" x-text="exportTargetBackup?.filename"></div>
+        <div class="text-[11px] text-slate-500 truncate" x-text="`SHA-256: ${exportTargetBackup?.sha256}`"></div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Destination Cloud Provider</label>
+          <select 
+            x-model="cloudProvider" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-sky-500"
+          >
+            <option value="github">GitHub Repository (Contents API)</option>
+            <option value="google_drive">Google Drive (Resumable Upload Session)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" x-text="cloudProvider === 'github' ? 'GitHub Personal Access Token (repo scope)' : 'Google OAuth Access Token'"></label>
+          <input 
+            type="password" 
+            x-model="cloudToken" 
+            placeholder="Token" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
+          >
+        </div>
+
+        <div x-show="cloudProvider === 'github'">
+          <label class="block text-xs font-medium text-slate-300 mb-1">Repository Target (owner/repo)</label>
+          <input 
+            type="text" 
+            x-model="cloudRepo" 
+            placeholder="my-org/telegram-backups" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
+          >
+        </div>
+
+        <div x-show="cloudProvider === 'google_drive'">
+          <label class="block text-xs font-medium text-slate-300 mb-1">Google Drive Folder ID (optional)</label>
+          <input 
+            type="text" 
+            x-model="cloudFolderId" 
+            placeholder="root or folder-id" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
+          >
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button @click="showCloudExportModal = false" class="px-3.5 py-1.5 text-xs rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition">Cancel</button>
+        <button 
+          @click="executeCloudExport()" 
+          :disabled="cloudExporting || !cloudToken"
+          class="px-4 py-1.5 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 transition flex items-center space-x-1.5"
+        >
+          <span x-show="cloudExporting" class="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full mr-1"></span>
+          <span x-text="cloudExporting ? 'Exporting...' : 'Upload Snapshot'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

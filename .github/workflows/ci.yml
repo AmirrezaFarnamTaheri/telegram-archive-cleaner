@@ -22,32 +22,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      # Runs first and separately: this is the suite that needs nothing
-      # installed at all, so a break here means the core itself regressed
-      # rather than some dependency's API changing underneath it.
-      - name: Core tests (stdlib only, no dependencies installed)
-        run: PYTHONPATH=src python3 -m unittest discover -s tests/core -t . -v
-
-      - name: Install
-        run: pip install -e ".[dev,portals]"
-
-      - name: Gate eval (precision/recall against golden fixtures)
-        run: PYTHONPATH=src python3 -m predoc_pipeline.cli eval
-
-      - name: Offline smoke check
-        run: PYTHONPATH=src python3 -m predoc_pipeline.cli smoke
-
-      - name: Full test suite with coverage
+      - name: Install dependencies
         run: |
-          PYTHONPATH=src python3 -m pytest tests/ \
-            --cov=predoc_pipeline --cov-report=xml --cov-report=term-missing -v
+          pip install --upgrade pip
+          pip install -e ".[dev,optional]"
 
-      - name: Lint
-        run: ruff check src tests
+      - name: Lint and format check
+        run: |
+          ruff check src tests
+          ruff format --check src tests
 
-      - name: Type check
-        run: mypy src
-        continue-on-error: true  # advisory until the codebase is fully annotated
-
-      - name: Enforce stdlib-only core (belt and suspenders)
-        run: PYTHONPATH=src python3 -m pytest tests/core/test_no_third_party.py -v
+      - name: Run pytest test suite
+        run: |
+          PYTHONPATH=src pytest tests/ -v

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  tg-cleaner:
+    build: .
+    container_name: telegram-archive-cleaner
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_PHONE=${TELEGRAM_PHONE}
+      - TELEGRAM_SESSION_NAME=cleaner_session
+      - TELEGRAM_PROXY_TYPE=${TELEGRAM_PROXY_TYPE:-}
+      - TELEGRAM_PROXY_HOST=${TELEGRAM_PROXY_HOST:-}
+      - TELEGRAM_PROXY_PORT=${TELEGRAM_PROXY_PORT:-}
+      - TELEGRAM_PROXY_USERNAME=${TELEGRAM_PROXY_USERNAME:-}
+      - TELEGRAM_PROXY_PASSWORD=${TELEGRAM_PROXY_PASSWORD:-}
+      - TELEGRAM_PROXY_SECRET=${TELEGRAM_PROXY_SECRET:-}
+      - DATA_SAVER_MODE=true
+      - DB_PATH=/app/data/cleaner.db
+      - BACKUP_DIR=/app/backups
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8000
+      - API_TOKEN=${API_TOKEN:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+      - ./cleaner_session.session:/app/cleaner_session.session
