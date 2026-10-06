@@ -5,7 +5,7 @@ Identifies messages that have exceeded user retention cutoffs or reference expir
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from tg_cleaner.core.db import DatabaseManager
 from tg_cleaner.core.models import AnalysisFlag, FlagType
@@ -24,8 +24,8 @@ class StaleContentAnalyzer:
         if not max_age_days or max_age_days <= 0:
             return []
 
-        messages = self.db.get_messages(chat_id)
-        now = datetime.utcnow()
+        messages = self.db.get_active_messages(chat_id)
+        now = datetime.now(UTC).replace(tzinfo=None)
         cutoff_date = now - timedelta(days=max_age_days)
 
         flags: list[AnalysisFlag] = []

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -45,15 +46,21 @@ class Settings(BaseSettings):
     backup_dir: str = "backups"
 
     # Web Dashboard Server
-    web_host: str = "0.0.0.0"
+    web_host: str = "127.0.0.1"
     web_port: int = 8000
     api_token: str | None = None
+    max_import_bytes: int = 64 * 1024 * 1024
+    stale_after_days: int | None = None
+    enable_demo_data: bool = True
 
-    # Optional Semantic LLM Evaluation
+    # Optional Semantic LLM Evaluation (explicit opt-in; message text leaves the device)
+    enable_llm_analysis: bool = False
+    llm_provider: str = "gemini"
+    llm_model: str | None = None
     gemini_api_key: str | None = None
     openai_api_key: str | None = None
 
-    @field_validator("telegram_api_id", "telegram_proxy_port", "web_port", mode="before")
+    @field_validator("telegram_api_id", "telegram_proxy_port", "web_port", "max_import_bytes", "stale_after_days", mode="before")
     @classmethod
     def parse_empty_int(cls, v: Any) -> int | None:
         if v is None or v == "":
@@ -73,6 +80,7 @@ class Settings(BaseSettings):
         "api_token",
         "gemini_api_key",
         "openai_api_key",
+        "llm_model",
         mode="before",
     )
     @classmethod
@@ -204,4 +212,15 @@ def update_credentials_and_save(
         if k not in seen:
             new_lines.append(f"{k}={v}")
 
-    env_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp_file = env_file.with_name(f".{env_file.name}.tmp")
+    tmp_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    try:
+        os.chmod(tmp_file, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp_file, env_file)
+    try:
+        os.chmod(env_file, 0o600)
+    except OSError:
+        pass

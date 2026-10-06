@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -15,6 +15,7 @@ class FlagType(StrEnum):
     DUPLICATE_EXACT_TEXT = "DUPLICATE_EXACT_TEXT"
     DUPLICATE_FUZZY_TEXT = "DUPLICATE_FUZZY_TEXT"
     DUPLICATE_EXACT_MEDIA = "DUPLICATE_EXACT_MEDIA"
+    DUPLICATE_VISUAL_MEDIA = "DUPLICATE_VISUAL_MEDIA"
     DUPLICATE_SAME_MEDIA_DIFF_CAPTION = "DUPLICATE_SAME_MEDIA_DIFF_CAPTION"
     DUPLICATE_FORWARD = "DUPLICATE_FORWARD"
     STALE_DEAD_LINK = "STALE_DEAD_LINK"
@@ -32,6 +33,7 @@ class DuplicateGroupType(StrEnum):
     EXACT_TEXT = "EXACT_TEXT"
     FUZZY_TEXT = "FUZZY_TEXT"
     EXACT_MEDIA = "EXACT_MEDIA"
+    VISUAL_SIMILAR_MEDIA = "VISUAL_SIMILAR_MEDIA"
     SAME_MEDIA_DIFF_CAPTION = "SAME_MEDIA_DIFF_CAPTION"
     FORWARD_CHAIN = "FORWARD_CHAIN"
 
@@ -142,4 +144,4 @@ class DeletionResult(BaseModel):
     failed_ids: list[int] = Field(default_factory=list)
     backup_path: str | None = None
     is_dry_run: bool = False
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))

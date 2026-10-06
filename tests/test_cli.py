@@ -54,14 +54,14 @@ def test_cli_import_and_scan_and_delete(tmp_path: Path):
     # 2. Test scan command
     res_scan = runner.invoke(app, ["scan", "555", "--db-path", db_path])
     assert res_scan.exit_code == 0
-    assert "Audit completed successfully" in res_scan.stdout
+    assert "Analysis complete" in res_scan.stdout
     assert "Exact duplicates:" in res_scan.stdout
 
     # 3. Test delete dry-run command
     res_del = runner.invoke(app, ["delete", "555", "--dry-run", "--db-path", db_path])
     assert res_del.exit_code == 0
     assert "DRY-RUN SIMULATION completed" in res_del.stdout
-    assert "Backup snapshot verified" in res_del.stdout
+    assert "Backup verified" in res_del.stdout
 
 
 def test_cli_main_dispatch(monkeypatch):

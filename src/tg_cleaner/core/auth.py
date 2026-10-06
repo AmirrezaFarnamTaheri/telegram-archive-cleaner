@@ -108,18 +108,17 @@ class TelegramAuthManager:
 
         code = typer.prompt("Enter the verification code sent to your Telegram app")
 
-        from telethon.errors import SessionPasswordNeededError
-
         try:
             user = await self.sign_in_with_code(target_phone, code, phone_code_hash)
-            name = getattr(user, "first_name", "Telegram User")
-            typer.secho(f"[OK] Successfully logged in as {name}!", fg=typer.colors.GREEN)
-        except SessionPasswordNeededError:
+        except ValueError as exc:
+            if "2fa password required" not in str(exc).lower():
+                raise
             password = typer.prompt(
                 "Enter your 2FA Two-Step Verification Password", hide_input=True
             )
             user = await self.sign_in_with_code(
                 target_phone, code, phone_code_hash, password=password
             )
-            name = getattr(user, "first_name", "Telegram User")
-            typer.secho(f"[OK] Successfully logged in as {name}!", fg=typer.colors.GREEN)
+
+        name = getattr(user, "first_name", "Telegram User")
+        typer.secho(f"[OK] Successfully logged in as {name}!", fg=typer.colors.GREEN)

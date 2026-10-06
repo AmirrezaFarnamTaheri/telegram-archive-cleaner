@@ -15,13 +15,14 @@ from tg_cleaner.analyzer.stale import StaleContentAnalyzer
 from tg_cleaner.cleaner.backup import BackupManager
 from tg_cleaner.cleaner.executor import DeletionExecutor
 from tg_cleaner.core.db import DatabaseManager
+from tg_cleaner.core.models import RetentionPreset
 from tg_cleaner.core.settings import settings
 from tg_cleaner.ingest.desktop_export import parse_desktop_export_json
 from tg_cleaner.web.app import create_app
 
 app = typer.Typer(
     name="tg-cleaner",
-    help="Intelligent Telegram Archive Cleaner with multi-engine deduplication and safety-first deletion.",
+    help="Review and clean Telegram archives with duplicate detection, link checks, backups, and optional live deletion.",
     add_completion=False,
 )
 
@@ -72,7 +73,7 @@ def login(
 def sync(
     limit: int = typer.Option(100, help="Maximum number of dialogs to fetch"),
     session_name: str | None = typer.Option(None, help="Custom session name"),
-    db_path: str = typer.Option(settings.db_path, help="Path to SQLite staging database"),
+    db_path: str = typer.Option(settings.db_path, help="Path to the SQLite database"),
 ) -> None:
     """Sync available Telegram dialogs (Saved Messages, channels, groups) into local DB."""
     from tg_cleaner.core.auth import TelegramAuthManager
@@ -94,7 +95,7 @@ def sync(
         for d in dialogs:
             db.upsert_chat(d)
         typer.secho(
-            f"[OK] Synced {len(dialogs)} dialogs into local database!", fg=typer.colors.GREEN
+            f"[OK] Synced {len(dialogs)} dialogs into the local database", fg=typer.colors.GREEN
         )
 
     asyncio.run(_run())
@@ -103,7 +104,7 @@ def sync(
 @app.command(name="import")
 def import_export(
     export_path: Path = typer.Argument(..., help="Path to Telegram Desktop result.json file"),
-    db_path: str = typer.Option(settings.db_path, help="Path to SQLite staging database"),
+    db_path: str = typer.Option(settings.db_path, help="Path to the SQLite database"),
 ) -> None:
     """Import a Telegram Desktop JSON export archive."""
     if not export_path.is_file():
@@ -123,10 +124,10 @@ def import_export(
 
 @app.command()
 def scan(
-    chat_id: int = typer.Argument(..., help="Target chat ID to audit"),
-    db_path: str = typer.Option(settings.db_path, help="Path to SQLite staging database"),
+    chat_id: int = typer.Argument(..., help="Target chat ID to analyze"),
+    db_path: str = typer.Option(settings.db_path, help="Path to the SQLite database"),
 ) -> None:
-    """Audit chat for duplicates, dead links, and policy-restricted content."""
+    """Analyze a chat for duplicates, broken links, stale content, and Telegram restrictions."""
     db = DatabaseManager(db_path)
     db.init_db()
 
@@ -139,7 +140,7 @@ def scan(
         )
         raise typer.Exit(code=1)
 
-    typer.echo(f"Running audit pipeline on chat '{chat.title}' (ID: {chat_id})...")
+    typer.echo(f"Analyzing chat '{chat.title}' (ID: {chat_id})...")
     db.clear_flags_for_chat(chat_id)
 
     # 1. Deduplication
@@ -160,7 +161,7 @@ def scan(
 
     stats = db.get_scan_stats(chat_id)
 
-    typer.secho("[OK] Audit completed successfully!", fg=typer.colors.GREEN)
+    typer.secho("[OK] Analysis complete", fg=typer.colors.GREEN)
     typer.echo(f"  • Total messages:            {stats.total_messages}")
     typer.echo(f"  • Exact duplicates:          {stats.exact_duplicates}")
     typer.echo(f"  • Same media / diff caption: {stats.same_media_diff_caption}")
@@ -177,11 +178,24 @@ def delete(
         True, "--dry-run/--live", help="Simulate deletion or perform live deletion"
     ),
     preset: str = typer.Option("KEEP_NEWEST", help="Retention preset for duplicate groups"),
-    db_path: str = typer.Option(settings.db_path, help="Path to SQLite staging database"),
+    db_path: str = typer.Option(settings.db_path, help="Path to the SQLite database"),
 ) -> None:
-    """Execute pre-deletion backup and paced message deletion."""
+    """Create a backup, then simulate or perform message deletion."""
     db = DatabaseManager(db_path)
     db.init_db()
+
+    try:
+        selected_preset = RetentionPreset(preset.strip().upper())
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in RetentionPreset)
+        typer.secho(f"Invalid preset. Choose one of: {allowed}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=2) from exc
+
+    # The CLI preset is an execution input, so apply it before calculating the
+    # candidate set rather than silently ignoring it.
+    dedupe_engine = DeduplicationEngine(db)
+    for group in db.get_duplicate_groups(chat_id):
+        dedupe_engine.apply_retention_preset(group, selected_preset)
 
     candidates = db.get_deletion_candidates(chat_id)
     if not candidates:
@@ -192,29 +206,46 @@ def delete(
     mode_str = "DRY-RUN SIMULATION" if dry_run else "LIVE TELEGRAM DELETION"
     typer.echo(f"Preparing {mode_str} for {len(candidate_ids)} messages in chat {chat_id}...")
 
-    executor = DeletionExecutor(
-        db=db, min_delay=0.01 if dry_run else 1.2, max_delay=0.02 if dry_run else 2.5
-    )
-
     def on_progress(done: int, total: int):
         typer.echo(f"  Progress: {done}/{total} messages processed...", nl=False)
         typer.echo("\r", nl=False)
 
-    result = asyncio.run(
-        executor.delete_candidates(
+    async def _execute_delete():
+        client = None
+        if not dry_run:
+            from tg_cleaner.core.auth import TelegramAuthManager
+
+            auth = TelegramAuthManager()
+            if not await auth.is_authorized():
+                typer.secho(
+                    "Live deletion requires an authorized Telegram session. Run `tg-cleaner login` first.",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+            client = auth.get_client()
+
+        executor = DeletionExecutor(
+            db=db,
+            client=client,
+            min_delay=0.01 if dry_run else 1.2,
+            max_delay=0.02 if dry_run else 2.5,
+        )
+        return await executor.delete_candidates(
             chat_id=chat_id,
             message_ids=candidate_ids,
             dry_run=dry_run,
             progress_callback=on_progress,
         )
-    )
+
+    result = asyncio.run(_execute_delete())
 
     typer.echo("")
     typer.secho(
         f"[OK] {mode_str} completed! Processed: {result.deleted_count}/{result.total_candidates} messages.",
         fg=typer.colors.GREEN,
     )
-    typer.echo(f"   Backup snapshot verified at: {result.backup_file}")
+    typer.echo(f"   Backup verified: {result.backup_file}")
 
 
 @app.command()

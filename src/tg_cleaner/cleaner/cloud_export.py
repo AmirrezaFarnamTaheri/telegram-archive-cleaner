@@ -48,7 +48,7 @@ class CloudExportManager:
         expected_hash = data.get("sha256") or data.get("sha256_checksum", "")
         messages = data.get("messages", [])
         actual_hash = hashlib.sha256(
-            json.dumps(messages, sort_keys=True).encode("utf-8")
+            json.dumps(messages, sort_keys=True, ensure_ascii=False).encode("utf-8")
         ).hexdigest()
 
         is_valid = actual_hash == expected_hash

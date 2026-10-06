@@ -3,14 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telegram Archive Cleaner: Forensic Data Cockpit</title>
-  
-  <!-- Modern Craft Typography: Plus Jakarta Sans + JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Standalone Offline Tailwind Engine -->
+  <meta name="color-scheme" content="dark">
+  <title>Telegram Archive Cleaner</title>
+
   <script src="tailwind.min.js"></script>
   <script>
     if (typeof tailwind !== 'undefined') {
@@ -19,1144 +14,857 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-              mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+              sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
             },
             colors: {
-              canvas: '#090d16',
-              surface: '#0f172a',
-              surfaceElevated: '#131d31',
-              borderSubtle: '#1e293b',
-              borderStrong: '#334155',
+              canvas: '#070b14',
+              panel: '#0f1728',
+              panelSoft: '#141f34',
+              line: '#22304a',
+              ink: '#f2f6ff',
+              muted: '#8ea0ba',
+            },
+            boxShadow: {
+              soft: '0 16px 48px rgba(0,0,0,.22)',
+              lift: '0 28px 80px rgba(0,0,0,.34)',
             }
           }
         }
       };
     }
   </script>
-
-  <!-- Application Controller State -->
   <script src="app.js"></script>
-  <!-- Standalone Offline Alpine.js Engine -->
   <script defer src="alpine.min.js"></script>
 
   <style>
+    [x-cloak] { display: none !important; }
     :root {
-      --bg-canvas: #090d16;
-      --bg-surface: #0f172a;
-      --bg-surface-elevated: #131d31;
-      --border-subtle: #1e293b;
-      --border-strong: #334155;
-      --accent-sky: #0284c7;
-      --accent-emerald: #10b981;
-      --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
+      --canvas: #070b14;
+      --canvas-2: #0a1020;
+      --panel: rgba(15, 23, 40, .86);
+      --panel-solid: #0f1728;
+      --panel-soft: #141f34;
+      --line: rgba(148, 163, 184, .11);
+      --line-strong: rgba(148, 163, 184, .18);
+      --text: #f2f6ff;
+      --muted: #8ea0ba;
+      --blue: #60a5fa;
+      --blue-strong: #3b82f6;
+      --emerald: #5eead4;
+      --violet: #a78bfa;
+      --amber: #fbbf24;
+      --rose: #fb7185;
     }
-    
+    html { background: var(--canvas); }
     body {
-      background-color: #090d16;
-      color: #f1f5f9;
-      font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 16% -8%, rgba(59,130,246,.14), transparent 30rem),
+        radial-gradient(circle at 82% 2%, rgba(139,92,246,.09), transparent 27rem),
+        linear-gradient(180deg, #080d18 0%, var(--canvas) 42%, #080d17 100%);
+      color: var(--text);
       text-rendering: optimizeLegibility;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      font-feature-settings: "ss01" 1, "cv11" 1;
     }
+    * { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+    :focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+    button, input, select { transition: border-color .16s ease, background-color .16s ease, color .16s ease, box-shadow .16s ease, transform .16s ease; }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    .content-grid {
+      background-image:
+        linear-gradient(rgba(148,163,184,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,.022) 1px, transparent 1px);
+      background-size: 32px 32px;
+      background-position: -1px -1px;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(17,27,47,.92), rgba(13,21,37,.92));
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 52px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.018);
+    }
+    .panel-soft {
+      background: rgba(255,255,255,.026);
+      border: 1px solid rgba(255,255,255,.05);
+    }
+    .panel-interactive:hover {
+      border-color: rgba(96,165,250,.18);
+      background: linear-gradient(180deg, rgba(22,34,57,.94), rgba(15,24,41,.94));
+      box-shadow: 0 20px 52px rgba(0,0,0,.22);
+    }
+    .hero-glow::before {
+      content: "";
+      position: absolute;
+      inset: -35% auto auto -8%;
+      width: 24rem;
+      height: 24rem;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(59,130,246,.16), transparent 68%);
+      pointer-events: none;
+    }
+    .hero-glow::after {
+      content: "";
+      position: absolute;
+      right: -8rem;
+      bottom: -10rem;
+      width: 24rem;
+      height: 24rem;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(139,92,246,.10), transparent 67%);
+      pointer-events: none;
+    }
+    .metric-sheen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, rgba(255,255,255,.035), transparent 38%);
+    }
+    .tab-pill {
+      min-height: 42px;
+      border-radius: 12px;
+      color: #718198;
+    }
+    .tab-pill:hover { color: #c9d5e6; background: rgba(255,255,255,.03); }
+    .tab-pill.is-active {
+      color: #f8fbff;
+      background: rgba(255,255,255,.065);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.055), 0 8px 20px rgba(0,0,0,.12);
+    }
+    .candidate-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(16,25,43,.9), rgba(13,21,36,.9));
+      border: 1px solid rgba(255,255,255,.052);
+      box-shadow: 0 12px 30px rgba(0,0,0,.10);
+    }
+    .candidate-card:hover { border-color: rgba(148,163,184,.13); background: linear-gradient(180deg, rgba(19,30,51,.96), rgba(14,23,40,.96)); }
+    .candidate-card.is-staged { border-color: rgba(96,165,250,.28); box-shadow: 0 18px 40px rgba(18,76,143,.10), inset 0 0 0 1px rgba(96,165,250,.08); }
+    .candidate-card .accent { position:absolute; left:0; top:0; bottom:0; width:3px; opacity:.82; }
+    .mono-value { font-variant-numeric: tabular-nums; }
+    .status-dot { box-shadow: 0 0 0 4px rgba(255,255,255,.025); }
+    .fade-edge { mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent); }
 
-    [x-cloak] { 
-      display: none !important; 
+    .workflow-line { position: relative; }
+    .workflow-line::before {
+      content: "";
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: 17px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(94,234,212,.34), rgba(96,165,250,.16), rgba(148,163,184,.08));
     }
+    .workflow-node { position: relative; z-index: 1; min-width: 92px; }
+    .workflow-node-dot {
+      display: flex;
+      height: 34px;
+      width: 34px;
+      align-items: center;
+      justify-content: center;
+      margin-inline: auto;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,.11);
+      background: #0f1728;
+      box-shadow: 0 0 0 5px rgba(9,14,26,.78);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      color: #5f7088;
+    }
+    .workflow-node.is-complete .workflow-node-dot { border-color: rgba(94,234,212,.26); background: rgba(45,212,191,.105); color: #73ead4; }
+    .workflow-node.is-current .workflow-node-dot { border-color: rgba(96,165,250,.30); background: rgba(59,130,246,.12); color: #93c5fd; box-shadow: 0 0 0 5px rgba(9,14,26,.78), 0 0 28px rgba(59,130,246,.13); }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .38rem;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: .5rem .72rem;
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 650;
+      color: #6f8098;
+    }
+    .filter-chip:hover { color: #c1cede; background: rgba(255,255,255,.035); }
+    .filter-chip.is-active { color: #dbeafe; background: rgba(59,130,246,.095); border-color: rgba(96,165,250,.15); box-shadow: inset 0 1px 0 rgba(255,255,255,.02); }
+    .media-well {
+      display: flex;
+      height: 76px;
+      width: 76px;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid rgba(148,163,184,.075);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(148,163,184,.055), rgba(148,163,184,.018));
+      color: #60718a;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+    }
+    .media-well:hover { border-color: rgba(96,165,250,.15); background: linear-gradient(145deg, rgba(59,130,246,.075), rgba(148,163,184,.018)); color: #87b8ff; }
+    .reason-panel {
+      border: 1px solid rgba(148,163,184,.065);
+      border-radius: 13px;
+      background: rgba(2,6,23,.16);
+    }
+    .score-track { height: 3px; width: 58px; overflow: hidden; border-radius: 999px; background: rgba(148,163,184,.10); }
+    .score-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #60a5fa, #5eead4); }
+    .staged-tray {
+      background: linear-gradient(135deg, rgba(17,36,63,.96), rgba(10,24,43,.97));
+      border: 1px solid rgba(96,165,250,.18);
+      box-shadow: 0 28px 80px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.03);
+      backdrop-filter: blur(22px);
+    }
+    .modal-panel {
+      background: linear-gradient(180deg, rgba(18,28,47,.985), rgba(10,17,30,.985));
+      border: 1px solid rgba(148,163,184,.12);
+      box-shadow: 0 34px 120px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+    }
+    .input-field {
+      border: 1px solid rgba(148,163,184,.08) !important;
+      background: rgba(2,6,23,.18) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.012);
+    }
+    .input-field:hover { border-color: rgba(148,163,184,.14) !important; }
+    .input-field:focus { border-color: rgba(96,165,250,.34) !important; box-shadow: 0 0 0 3px rgba(59,130,246,.07) !important; outline: none; }
 
-    /* Custom Technical Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+    @media (max-width: 767px) {
+      .mobile-edge { margin-left: -1rem; margin-right: -1rem; border-left: 0; border-right: 0; border-radius: 0; }
+      .workflow-line::before { display: none; }
+      .workflow-node { min-width: 0; }
+      .media-well { height: 60px; width: 60px; border-radius: 14px; }
+      .mobile-scroll { scroll-snap-type: x proximity; }
+      .mobile-scroll > * { scroll-snap-align: start; }
     }
-    ::-webkit-scrollbar-track {
-      background: #090d16;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #1e293b;
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #334155;
-    }
-
-    .scrollbar-none::-webkit-scrollbar {
-      display: none;
-    }
-    .scrollbar-none {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      *, ::before, ::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
+      *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
     }
   </style>
 </head>
-<body 
-  class="bg-canvas text-slate-100 min-h-[100dvh] font-sans antialiased selection:bg-sky-500/30 overflow-x-hidden" 
-  x-data="cleanerApp()" 
-  x-cloak
->
+<body x-data="cleanerApp()" x-cloak class="font-sans antialiased selection:bg-blue-500/30">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-lg focus:bg-blue-600 focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
 
-  <!-- Accessibility Skip Link -->
-  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-1.5 focus:bg-sky-600 focus:text-white focus:rounded focus:outline-none focus:ring-2 focus:ring-white text-xs font-mono">Skip to main content</a>
-
-  <!-- Sticky Top Cockpit Bar -->
-  <header role="banner" class="border-b border-borderSubtle bg-canvas/95 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-5 py-2.5 flex items-center justify-between min-h-[53px]">
-    <div class="flex items-center space-x-2 sm:space-x-3.5 min-w-0">
-      <!-- Mobile Drawer Toggle Button -->
-      <button 
-        @click="sidebarOpen = !sidebarOpen" 
-        class="p-2 sm:p-1.5 rounded-md bg-surface border border-borderSubtle text-slate-300 hover:text-white hover:border-slate-600 transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shrink-0"
-        aria-label="Toggle Navigation Sidebar"
-        title="Toggle Sources"
-      >
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
-        </svg>
+  <!-- Top bar -->
+  <header class="sticky top-0 z-40 border-b border-white/[.06] bg-[#080d18]/88 shadow-[0_10px_36px_rgba(0,0,0,.16)] backdrop-blur-2xl">
+    <div class="mx-auto flex h-16 max-w-[1720px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <button @click="sidebarOpen = !sidebarOpen" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white md:hidden" aria-label="Toggle archive sources">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 12h16M4 18h10"/></svg>
       </button>
 
-      <div class="w-8 h-8 rounded-md bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-mono font-bold text-xs tracking-wider shrink-0 shadow-inner">
-        TG
-      </div>
-      <div class="min-w-0">
-        <div class="flex items-center space-x-1.5 sm:space-x-2">
-          <h1 class="text-xs sm:text-sm font-bold tracking-tight text-white truncate">Archive Cleaner</h1>
-          <span class="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.2 rounded bg-surfaceElevated border border-borderSubtle text-slate-400 shrink-0">v1.2</span>
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-blue-500/25 to-indigo-500/10 shadow-[0_10px_30px_rgba(37,99,235,.12)] ring-1 ring-blue-300/20">
+          <svg class="h-5 w-5 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2zm2 4h6M9 12h6M9 16h4"/></svg>
         </div>
-        <p class="text-[10px] sm:text-[11px] text-slate-400 hidden md:block truncate">Forensic duplicate analysis and verified rollback</p>
-      </div>
-    </div>
-
-    <!-- Center Command Palette Trigger -->
-    <div class="hidden md:flex items-center flex-1 max-w-xs mx-4">
-      <button 
-        @click="showCommandPalette = true" 
-        class="w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md bg-surface border border-borderSubtle hover:border-slate-600 text-slate-400 hover:text-slate-200 transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none font-mono"
-        title="Search commands (Ctrl+K)"
-      >
-        <div class="flex items-center space-x-2">
-          <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span class="text-[11px]">Command Palette</span>
+        <div class="min-w-0">
+          <div class="truncate text-sm font-semibold tracking-[-.01em] text-white">Telegram Archive Cleaner</div>
+          <div class="hidden text-[11px] text-slate-500 sm:block">Review and clean up Telegram archives</div>
         </div>
-        <kbd class="px-1.5 py-0.5 text-[10px] rounded bg-surfaceElevated border border-borderSubtle text-slate-400">Ctrl+K</kbd>
-      </button>
-    </div>
-
-    <!-- System Telemetry & Global Controls -->
-    <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-      <!-- Database Status Indicator -->
-      <div 
-        class="hidden sm:flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border border-borderSubtle bg-surface/70 font-mono" 
-        :title="dbHealthy ? 'SQLite database active with WAL journaling' : (isOfflineMode ? 'Running in standalone preview mode' : 'Backend daemon is offline')"
-      >
-        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="dbHealthy ? 'bg-emerald-400' : (isOfflineMode ? 'bg-amber-400' : 'bg-rose-500')"></span>
-        <span class="text-slate-300 text-[11px]" x-text="dbHealthy ? 'SQLite Active' : (isOfflineMode ? 'Offline Sandbox' : 'DB Offline')"></span>
       </div>
 
-      <!-- Edge Relay Indicator -->
-      <div class="hidden lg:flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-md border font-mono transition-colors" :class="relayConfigured ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-surface/70 border-borderSubtle text-slate-400'" title="Edge Relay proxy status for safe link audits">
-        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <span class="text-[11px]" x-text="relayConfigured ? 'Relay (' + relayProvider + ')' : 'Direct Network'"></span>
+      <div class="ml-auto flex items-center gap-2">
+        <div class="hidden items-center gap-2 rounded-full bg-white/[.04] px-3 py-1.5 text-xs text-slate-300 sm:flex">
+          <span class="h-2 w-2 rounded-full" :class="apiAuthRequired ? 'bg-amber-400' : (dbHealthy ? 'bg-emerald-400' : (isOfflineMode ? 'bg-violet-400' : 'bg-rose-400'))"></span>
+          <span x-text="apiAuthRequired ? 'Token required' : (dbHealthy ? 'Local service ready' : (isOfflineMode ? 'Sandbox' : 'Local service unavailable'))"></span>
+        </div>
+        <button @click="showCommandPalette = true" class="hidden h-9 items-center gap-2 rounded-lg bg-white/[.04] px-3 text-xs text-slate-400 hover:bg-white/[.07] hover:text-slate-200 lg:flex" title="Command palette (Ctrl+K)">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+          Commands <kbd class="rounded bg-black/20 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">Ctrl K</kbd>
+        </button>
+        <button @click="refreshAll()" class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/[.04] text-slate-400 hover:bg-white/[.07] hover:text-white" aria-label="Refresh" title="Refresh">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8 8 0 10-2.34 5.66M20 5v6h-6"/></svg>
+        </button>
+        <button @click="showImportModal = true" class="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-b from-blue-500 to-blue-600 px-3.5 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.20)] ring-1 ring-blue-300/20 hover:from-blue-400 hover:to-blue-500">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+          <span class="hidden sm:inline">Import archive</span>
+          <span class="sm:hidden">Import</span>
+        </button>
       </div>
-
-      <!-- MTProto Authentication Trigger -->
-      <button 
-        @click="showAuthModal = true" 
-        class="px-2.5 py-1 text-xs font-medium rounded-md border transition-all active:scale-[0.98] flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none" 
-        :class="telegramAuth ? 'bg-emerald-950/40 border-emerald-700 text-emerald-300' : 'bg-surface hover:bg-surfaceElevated text-slate-300 border-borderSubtle'"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-        <span class="hidden sm:inline" x-text="telegramAuth ? 'MTProto Active' : 'MTProto'"></span>
-      </button>
-
-      <!-- Import Desktop Archive -->
-      <button 
-        @click="showImportModal = true" 
-        class="px-2.5 py-1 text-xs font-medium rounded-md bg-surface hover:bg-surfaceElevated text-slate-200 border border-borderSubtle active:scale-[0.98] transition flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none"
-      >
-        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-        </svg>
-        <span class="hidden sm:inline">Import JSON</span>
-      </button>
-
-      <!-- Keyboard Shortcuts Modal Trigger -->
-      <button 
-        @click="showShortcutsModal = true" 
-        class="hidden sm:inline-flex px-2 py-1 text-xs font-mono rounded-md bg-surface hover:bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none" 
-        title="Keyboard Shortcuts (?)"
-      >
-        ?
-      </button>
-
-      <!-- Sync / Refresh -->
-      <button 
-        @click="refreshAll()" 
-        class="p-1.5 text-xs rounded-md bg-surface hover:bg-surfaceElevated text-slate-300 border border-borderSubtle active:scale-[0.98] transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none" 
-        title="Synchronize Workspace"
-        aria-label="Synchronize Workspace"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      </button>
     </div>
   </header>
 
-  <!-- Cockpit Work Environment -->
-  <div class="relative flex h-[calc(100dvh-53px)] overflow-hidden">
+  <div class="mx-auto flex max-w-[1720px]">
+    <!-- mobile overlay -->
+    <button x-show="isMobile && sidebarOpen" @click="sidebarOpen = false" class="fixed inset-0 z-40 bg-black/70 backdrop-blur-[2px] md:hidden" aria-label="Close archive sources"></button>
 
-    <!-- Mobile Drawer Backdrop Overlay -->
-    <div 
-      x-show="sidebarOpen && isMobile" 
-      x-transition:enter="transition-opacity ease-out duration-200"
-      x-transition:enter-start="opacity-0"
-      x-transition:enter-end="opacity-100"
-      x-transition:leave="transition-opacity ease-in duration-150"
-      x-transition:leave-start="opacity-100"
-      x-transition:leave-end="opacity-0"
-      @click="sidebarOpen = false" 
-      class="fixed inset-0 bg-black/75 backdrop-blur-xs z-40 md:hidden"
-      aria-hidden="true"
-    ></div>
-
-    <!-- Navigation Sidebar -->
-    <aside 
-      x-show="sidebarOpen || !isMobile"
-      :class="{
-        'fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-surface border-r border-borderSubtle shadow-2xl': isMobile,
-        'hidden md:flex md:w-64 lg:w-72 md:shrink-0 md:flex-col md:border-r md:border-borderSubtle md:bg-surface/50': !isMobile && sidebarOpen,
-        'hidden': !sidebarOpen && !isMobile
-      }"
-      role="navigation" 
-      class="p-3.5 sm:p-4 flex flex-col space-y-3 transition-all duration-200 overflow-y-auto"
-    >
-      <!-- Mobile Drawer Close Header -->
-      <div class="flex items-center justify-between pb-2 border-b border-borderSubtle md:hidden">
-        <span class="text-xs font-bold text-white uppercase tracking-wider font-mono">Archive Sources</span>
-        <button @click="sidebarOpen = false" aria-label="Close sidebar" class="p-1 rounded text-slate-400 hover:text-white">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+    <!-- Source rail -->
+    <aside x-show="sidebarOpen" class="fixed inset-y-16 left-0 z-50 flex w-[292px] flex-col border-r border-white/[.06] bg-[#0a1120]/96 shadow-[22px_0_60px_rgba(0,0,0,.16)] backdrop-blur-xl md:sticky md:top-16 md:z-20 md:h-[calc(100dvh-4rem)] md:shrink-0 md:shadow-none" x-transition>
+      <div class="flex items-center justify-between px-5 pb-3 pt-5">
+        <div>
+          <h2 class="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Archive sources</h2>
+          <p class="mt-1 text-xs text-slate-600" x-text="chats.length + ' available'"></p>
+        </div>
+        <button @click="showImportModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/[.05] text-slate-400 hover:bg-white/[.08] hover:text-white" aria-label="Import archive">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-width="1.8" d="M12 5v14M5 12h14"/></svg>
         </button>
       </div>
 
-      <div class="hidden md:flex items-center justify-between px-1">
-        <h2 class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold">Indexed Sources</h2>
-        <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-surfaceElevated border border-borderSubtle text-slate-400" x-text="chats.length"></span>
+      <div class="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
+        <template x-for="chat in chats" :key="chat.id">
+          <button @click="selectChat(chat)" class="group w-full rounded-2xl px-3 py-3 text-left transition" :class="selectedChat && selectedChat.id === chat.id ? 'bg-gradient-to-r from-blue-500/[.11] to-indigo-500/[.045] shadow-[inset_0_0_0_1px_rgba(96,165,250,.14)]' : 'hover:bg-white/[.035]'">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[.04] text-xs font-semibold text-slate-400 group-hover:text-slate-200" :class="selectedChat && selectedChat.id === chat.id ? 'bg-blue-500/15 text-blue-300' : ''" x-text="(chat.title || 'A').slice(0,2).toUpperCase()"></div>
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm font-medium" :class="selectedChat && selectedChat.id === chat.id ? 'text-white' : 'text-slate-300'" x-text="chat.title"></div>
+                <div class="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                  <span x-text="(chat.total_messages || 0).toLocaleString() + ' messages'"></span>
+                  <span aria-hidden="true">·</span>
+                  <span class="truncate" x-text="chat.chat_type || 'archive'"></span>
+                </div>
+              </div>
+            </div>
+          </button>
+        </template>
+
+        <div x-show="chats.length === 0" class="mx-2 mt-3 rounded-xl bg-white/[.03] p-4 text-xs leading-5 text-slate-500">
+          No archives are available yet. Import a Telegram Desktop JSON export to begin.
+        </div>
       </div>
 
-      <!-- Demo Sandbox Ingestion Trigger -->
-      <button 
-        @click="generateDemoData()" 
-        class="w-full py-2 px-3 text-xs font-medium rounded-md bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 text-sky-300 transition-all active:scale-[0.98] flex items-center justify-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shadow-xs"
-      >
-        <svg class="w-3.5 h-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <span>Load Demo Archive</span>
-      </button>
-
-      <!-- Chat Records List -->
-      <div class="flex-1 overflow-y-auto space-y-1.5 pr-1">
-        <template x-for="chat in chats" :key="chat.id">
-          <div 
-            @click="selectChat(chat)" 
-            class="p-2.5 rounded-md border cursor-pointer transition-all active:scale-[0.99] flex flex-col space-y-1"
-            :class="selectedChat?.id === chat.id ? 'bg-sky-950/40 border-sky-500/60 text-white shadow-xs' : 'bg-surfaceElevated/60 border-borderSubtle hover:border-slate-700 text-slate-300'"
-          >
-            <div class="flex items-center justify-between">
-              <span class="font-medium text-xs truncate max-w-[150px]" x-text="chat.title"></span>
-              <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-surface border border-borderSubtle text-slate-400 uppercase" x-text="chat.chat_type"></span>
-            </div>
-            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500">
-              <span x-text="`${chat.total_messages} messages`"></span>
-              <span :class="chat.last_scanned ? 'text-emerald-400/90' : 'text-slate-500'" x-text="chat.last_scanned ? 'Audited' : 'Pending'"></span>
-            </div>
-          </div>
-        </template>
-        <div x-show="chats.length === 0" class="text-xs text-slate-500 text-center py-10 px-3">
-          <svg class="w-8 h-8 mx-auto text-slate-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-          <p class="font-medium text-slate-400">No archive loaded</p>
-          <p class="text-[11px] text-slate-500 mt-1">Import a Telegram Desktop export file or click the demo button above.</p>
-        </div>
+      <div class="border-t border-white/5 p-3">
+        <button @click="generateDemoData()" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs text-slate-400 hover:bg-white/[.04] hover:text-slate-200">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          Load demonstration archive
+        </button>
       </div>
     </aside>
 
-    <!-- Center Workspace Stage -->
-    <main id="main-content" role="main" class="flex-1 flex flex-col overflow-y-auto bg-canvas p-3 sm:p-5 lg:p-6 space-y-4 sm:space-y-5">
-      
-      <!-- Standalone Offline Sandbox Banner -->
-      <div 
-        x-show="isOfflineMode" 
-        class="bg-amber-950/25 border border-amber-800/40 rounded-lg p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-200/90 shadow-2xs"
-      >
-        <div class="flex items-center space-x-2.5 min-w-0">
-          <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse"></span>
-          <span class="truncate">
-            <strong>Standalone Sandbox:</strong> Client preview active. To connect live Telegram accounts and SQLite, launch <code class="bg-amber-900/40 px-1 py-0.5 rounded font-mono text-[11px] text-amber-100">TelegramArchiveCleaner.exe web</code>.
-          </span>
-        </div>
-        <div class="flex items-center space-x-2 shrink-0">
-          <button 
-            @click="generateDemoData()" 
-            class="px-2.5 py-1 text-[11px] font-medium rounded bg-amber-900/60 hover:bg-amber-800 border border-amber-700/60 text-amber-100 transition active:scale-[0.98]"
-          >
-            Load Sample Data
-          </button>
-        </div>
-      </div>
-
-      <!-- Empty State When No Chat is Selected -->
-      <div x-show="!selectedChat" class="text-center py-16 sm:py-24 text-slate-500 max-w-lg mx-auto">
-        <div class="w-14 h-14 rounded-xl bg-surface border border-borderSubtle flex items-center justify-center mx-auto mb-4 text-sky-400 shadow-md">
-          <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-          </svg>
-        </div>
-        <h2 class="text-base sm:text-lg font-bold text-slate-100">Select an archive source</h2>
-        <p class="text-xs text-slate-400 mt-1.5 mb-5 max-w-sm mx-auto">Choose an indexed chat from the left panel, import a desktop export JSON file, or launch the interactive demonstration sandbox.</p>
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5">
-          <button 
-            @click="generateDemoData()" 
-            class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] inline-flex items-center justify-center space-x-2 shadow-sm"
-          >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            <span>Launch Interactive Demo Sandbox</span>
-          </button>
-          <button 
-            @click="showImportModal = true" 
-            class="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-md bg-surface hover:bg-surfaceElevated border border-borderSubtle text-slate-200 transition active:scale-[0.98] inline-flex items-center justify-center space-x-2"
-          >
-            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-            <span>Import Desktop JSON</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Active Chat Workspace -->
-      <div x-show="selectedChat" class="space-y-4 sm:space-y-5">
-        <!-- Target Chat Meta Banner -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-surface p-4 sm:p-5 rounded-lg border border-borderSubtle shadow-sm">
-          <div class="min-w-0">
-            <div class="flex items-center space-x-2.5">
-              <h2 class="text-base sm:text-lg font-bold text-white tracking-tight truncate" x-text="selectedChat?.title"></h2>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950/60 text-sky-300 border border-sky-800/50 uppercase shrink-0" x-text="selectedChat?.chat_type"></span>
-            </div>
-            <p class="text-[11px] font-mono text-slate-400 mt-1" x-text="`Target ID: ${selectedChat?.id} : Indexed Records: ${stats?.total_messages || 0} : Reclaimable: ${formatBytes(stats?.total_reclaimable_bytes || 0)}`"></p>
+    <!-- Main content -->
+    <main id="main-content" class="content-grid min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-7 lg:px-8 xl:px-10">
+      <div class="mx-auto max-w-[1320px]">
+        <!-- status banners -->
+        <div x-show="apiAuthRequired" class="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[.07] p-4 sm:flex-row sm:items-center">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-5 4h10a2 2 0 002-2v-8a2 2 0 00-2-2h-1V7a4 4 0 00-8 0v2H7a2 2 0 00-2 2v8a2 2 0 002 2zm3-12V7a2 2 0 114 0v2h-4z"/></svg>
           </div>
-
-          <div class="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
-            <button 
-              @click="runScan()" 
-              :disabled="scanning"
-              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none shadow-sm cursor-pointer"
-            >
-              <svg x-show="scanning" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-              <svg x-show="!scanning" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <span x-text="scanning ? 'Auditing Archive...' : 'Audit Archive'"></span>
-            </button>
-
-            <button 
-              @click="showDeleteModal = true" 
-              :disabled="selectedCandidateIds.length === 0"
-              class="flex-1 sm:flex-none px-3.5 py-2 text-xs font-semibold rounded-md bg-rose-600/90 hover:bg-rose-600 text-white transition active:scale-[0.98] flex items-center justify-center space-x-1.5 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none shadow-sm cursor-pointer"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              <span>Delete Staged (<span x-text="selectedCandidateIds.length"></span>)</span>
-            </button>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-amber-100">API token required</p>
+            <p class="mt-0.5 text-xs leading-5 text-amber-100/65">This local service requires an API token. Add it in Connection settings before loading data.</p>
+          </div>
+          <div class="flex w-full gap-2 sm:w-auto">
+            <input x-model="apiToken" @keydown.enter="saveApiToken()" type="password" autocomplete="off" placeholder="API token" class="h-9 min-w-0 flex-1 rounded-lg bg-black/20 px-3 font-mono text-xs text-amber-50 ring-1 ring-amber-300/20 placeholder:text-amber-100/30 sm:w-52">
+            <button @click="saveApiToken()" class="rounded-lg bg-amber-300 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-amber-200">Unlock</button>
           </div>
         </div>
 
-        <!-- Cockpit Telemetry Ribbon (Interactive High-Density Metrics) -->
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
-          <div class="bg-surface border border-borderSubtle p-3 rounded-lg shadow-2xs">
-            <div class="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Messages</div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-100 mt-1" x-text="stats?.total_messages || 0"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Indexed records</div>
-          </div>
-          
-          <div 
-            @click="filterByKpi('exact')" 
-            class="bg-surface border border-borderSubtle p-3 rounded-lg cursor-pointer hover:border-amber-600/50 transition-colors shadow-2xs"
-            title="Filter exact duplicate messages"
-          >
-            <div class="text-[10px] text-amber-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
-              <span>Exact Dupes</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            </div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-amber-300 mt-1" x-text="stats?.exact_duplicates || 0"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Identical SHA-256</div>
-          </div>
-
-          <div 
-            @click="filterByKpi('diff')" 
-            class="bg-surface border border-borderSubtle p-3 rounded-lg cursor-pointer hover:border-sky-600/50 transition-colors shadow-2xs"
-            title="View visual variations in Diff Studio"
-          >
-            <div class="text-[10px] text-sky-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
-              <span>Diff Dupes</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
-            </div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-sky-300 mt-1" x-text="stats?.diff_duplicates || 0"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Altered captions</div>
-          </div>
-
-          <div 
-            @click="filterByKpi('link')" 
-            class="bg-surface border border-borderSubtle p-3 rounded-lg cursor-pointer hover:border-rose-600/50 transition-colors shadow-2xs"
-            title="Filter dead links"
-          >
-            <div class="text-[10px] text-rose-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
-              <span>Dead Links</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            </div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-rose-300 mt-1" x-text="stats?.dead_links || 0"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">HTTP 404 / timeouts</div>
-          </div>
-
-          <div 
-            @click="filterByKpi('policy')" 
-            class="bg-surface border border-borderSubtle p-3 rounded-lg cursor-pointer hover:border-purple-600/50 transition-colors shadow-2xs"
-            title="Filter platform terms restrictions"
-          >
-            <div class="text-[10px] text-purple-400/90 font-mono uppercase tracking-wider flex items-center justify-between">
-              <span>Restricted</span>
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-            </div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-purple-300 mt-1" x-text="stats?.policy_flags || 0"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Terms flags</div>
-          </div>
-
-          <div class="bg-surface border border-borderSubtle p-3 rounded-lg shadow-2xs">
-            <div class="text-[10px] text-emerald-400/90 font-mono uppercase tracking-wider">Reclaimable</div>
-            <div class="text-xl sm:text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-1 truncate" x-text="formatBytes(stats?.total_reclaimable_bytes || 0)"></div>
-            <div class="text-[10px] text-slate-500 mt-0.5">Payload storage</div>
+        <div x-show="isOfflineMode && !apiAuthRequired" class="mb-5 flex items-start gap-3 rounded-2xl border border-violet-400/15 bg-violet-400/[.06] p-4">
+          <div class="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-violet-400"></div>
+          <div>
+            <p class="text-sm font-medium text-violet-100">Demo mode</p>
+            <p class="mt-1 text-xs leading-5 text-violet-100/60">The local service is unavailable, so the app is showing demo data. No Telegram account or archive will be changed.</p>
           </div>
         </div>
 
-        <!-- Navigation Tabs: Candidates, Diff Studio, Cryptographic Backups, MTProto -->
-        <div class="border-b border-borderSubtle flex space-x-2 sm:space-x-4 overflow-x-auto scrollbar-none">
-          <button 
-            @click="activeTab = 'candidates'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
-            :class="activeTab === 'candidates' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
-          >
-            <span>Flagged Candidates</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-surfaceElevated border border-borderSubtle text-slate-300" x-text="candidates.length"></span>
-          </button>
-
-          <button 
-            @click="activeTab = 'diffs'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
-            :class="activeTab === 'diffs' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
-          >
-            <span>Diff Studio</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-surfaceElevated border border-borderSubtle text-slate-300" x-text="diffGroups.length"></span>
-          </button>
-
-          <button 
-            @click="activeTab = 'backups'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
-            :class="activeTab === 'backups' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
-          >
-            <span>Backup Ledger</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-surfaceElevated border border-borderSubtle text-slate-300" x-text="backups.length"></span>
-          </button>
-
-          <button 
-            @click="activeTab = 'auth'" 
-            class="pb-2.5 px-1 text-xs font-semibold border-b-2 transition whitespace-nowrap flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer"
-            :class="activeTab === 'auth' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200'"
-          >
-            <span>MTProto & Settings</span>
-          </button>
-        </div>
-
-        <!-- TAB 1: FLAGGED CANDIDATES QUEUE -->
-        <div x-show="activeTab === 'candidates'" class="space-y-3.5">
-          <!-- Filter & Search Toolbar -->
-          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface p-3 rounded-lg border border-borderSubtle">
-            <!-- Filter Pills -->
-            <div class="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-              <button 
-                @click="candidateFilter = 'all'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
-                :class="candidateFilter === 'all' ? 'bg-sky-950 border border-sky-600 text-sky-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
-              >
-                All (<span x-text="candidates.length"></span>)
-              </button>
-              <button 
-                @click="candidateFilter = 'exact'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
-                :class="candidateFilter === 'exact' ? 'bg-amber-950 border border-amber-600 text-amber-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
-              >
-                Exact
-              </button>
-              <button 
-                @click="candidateFilter = 'diff'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
-                :class="candidateFilter === 'diff' ? 'bg-sky-950 border border-sky-600 text-sky-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
-              >
-                Visual Diff
-              </button>
-              <button 
-                @click="candidateFilter = 'link'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
-                :class="candidateFilter === 'link' ? 'bg-rose-950 border border-rose-600 text-rose-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
-              >
-                Dead Links
-              </button>
-              <button 
-                @click="candidateFilter = 'policy'" 
-                class="px-2.5 py-1 text-xs rounded-md font-medium transition cursor-pointer"
-                :class="candidateFilter === 'policy' ? 'bg-purple-950 border border-purple-600 text-purple-200' : 'bg-surfaceElevated text-slate-400 hover:text-white border border-borderSubtle'"
-              >
-                Policy
-              </button>
+        <!-- empty -->
+        <section x-show="!selectedChat && !apiAuthRequired" class="flex min-h-[62vh] items-center justify-center">
+          <div class="max-w-md text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300 ring-1 ring-blue-400/15">
+              <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 7h16v12H4zM7 4h10v3H7zM8 11h8M8 15h5"/></svg>
             </div>
-
-            <!-- Fast Search Input -->
-            <div class="relative w-full sm:w-64">
-              <input 
-                id="candidateSearchInput"
-                type="text" 
-                x-model="searchQuery" 
-                placeholder="Search text, IDs, or reason... (/)" 
-                class="w-full bg-canvas border border-borderSubtle rounded-md px-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 font-mono"
-              >
-              <button 
-                x-show="searchQuery" 
-                @click="searchQuery = ''" 
-                class="absolute right-2 top-1.5 text-slate-500 hover:text-slate-300 text-xs cursor-pointer"
-              >
-                &times;
-              </button>
+            <h1 class="mt-5 text-xl font-semibold text-white">Choose an archive to review</h1>
+            <p class="mt-2 text-sm leading-6 text-slate-400">Import a Telegram Desktop export or select a source from the sidebar. Nothing is staged automatically.</p>
+            <div class="mt-5 flex justify-center gap-2">
+              <button @click="showImportModal=true" class="rounded-xl bg-gradient-to-b from-blue-500 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.18)] ring-1 ring-blue-300/15 hover:from-blue-400 hover:to-blue-500">Import JSON</button>
+              <button @click="generateDemoData()" class="rounded-xl bg-white/[.045] px-4 py-2.5 text-sm font-medium text-slate-300 ring-1 ring-white/[.05] hover:bg-white/[.075]">Try demo</button>
             </div>
           </div>
+        </section>
 
-          <!-- Selection Controls Bar -->
-          <div class="flex items-center justify-between text-xs px-1 text-slate-400">
-            <div class="flex items-center space-x-2">
-              <button @click="selectAllCandidates()" class="hover:text-white underline cursor-pointer">Select All</button>
-              <span>:</span>
-              <button @click="deselectAllCandidates()" class="hover:text-white underline cursor-pointer">Deselect</button>
-              <span>:</span>
-              <span class="font-mono text-slate-300" x-text="`${selectedCandidateIds.length} of ${filteredCandidates().length} staged`"></span>
-            </div>
-            
-            <div class="font-mono text-[11px] text-slate-500" x-text="`Staged storage: ${formatBytes(selectedCandidatesBytes())}`"></div>
-          </div>
-
-          <!-- Candidates List Container -->
-          <div class="space-y-2">
-            <template x-for="candidate in paginatedCandidates()" :key="candidate.id">
-              <div 
-                class="p-3 sm:p-4 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-3"
-                :class="selectedCandidateIds.includes(candidate.id) ? 'bg-surfaceElevated border-sky-500/40 shadow-xs' : 'bg-surface border-borderSubtle'"
-              >
-                <div class="flex items-start space-x-3 min-w-0">
-                  <!-- Checkbox -->
-                  <input 
-                    type="checkbox" 
-                    :value="candidate.id" 
-                    x-model="selectedCandidateIds"
-                    class="mt-1 rounded bg-canvas border-borderStrong text-sky-600 focus:ring-sky-500 h-4 w-4 shrink-0 cursor-pointer"
-                  >
-
-                  <div class="space-y-1.5 min-w-0 flex-1">
-                    <div class="flex items-center space-x-2">
-                      <span class="font-mono text-xs font-bold text-slate-200" x-text="`#${candidate.id}`"></span>
-                      
-                      <!-- Flag Pill -->
-                      <span 
-                        class="text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold uppercase"
-                        :class="{
-                          'bg-amber-950/80 text-amber-300 border border-amber-800/60': candidate.flag_type === 'exact_duplicate',
-                          'bg-sky-950/80 text-sky-300 border border-sky-800/60': candidate.flag_type === 'diff_duplicate',
-                          'bg-rose-950/80 text-rose-300 border border-rose-800/60': candidate.flag_type === 'dead_link',
-                          'bg-purple-950/80 text-purple-300 border border-purple-800/60': candidate.flag_type === 'policy_violation'
-                        }"
-                        x-text="candidate.flag_type.replace('_', ' ')"
-                      ></span>
-
-                      <span class="text-[10px] text-slate-500 font-mono" x-text="formatDate(candidate.date)"></span>
-                    </div>
-
-                    <!-- Message Body -->
-                    <p class="text-xs text-slate-300 break-words line-clamp-2" x-text="candidate.text || '[No caption text]'"></p>
-
-                    <!-- Rationale note -->
-                    <div class="text-[11px] font-mono text-slate-400 flex items-center space-x-1.5">
-                      <span class="text-slate-500">Rationale:</span>
-                      <span class="text-slate-300 truncate" x-text="candidate.reason"></span>
-                    </div>
-                  </div>
+        <div x-show="selectedChat" class="space-y-6">
+          <!-- Archive overview -->
+          <section class="hero-glow panel relative overflow-hidden rounded-[28px] p-5 sm:p-6 lg:p-7">
+            <div class="relative z-[1] flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2 text-[11px] font-medium text-slate-500">
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-white/[.035] px-2.5 py-1 ring-1 ring-white/[.055]"><span class="h-1.5 w-1.5 rounded-full bg-blue-400"></span>Archive</span>
+                  <span class="text-slate-700">/</span>
+                  <span class="truncate" x-text="selectedChat?.chat_type || 'source'"></span>
+                  <span x-show="isOfflineMode" class="rounded-full bg-violet-400/[.08] px-2.5 py-1 text-violet-300 ring-1 ring-violet-400/15">Demo</span>
                 </div>
-
-                <!-- Media Pill & Direct Inspector Button -->
-                <div class="flex items-center sm:flex-col sm:items-end justify-between sm:justify-start gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-borderSubtle">
-                  <span class="text-[10px] font-mono text-slate-400" x-text="formatBytes(candidate.file_size || 0)"></span>
-                  
-                  <div class="flex items-center space-x-1.5">
-                    <button 
-                      @click="openRawInspector(candidate)" 
-                      class="px-2 py-1 text-[10px] font-mono rounded bg-surfaceElevated hover:bg-slate-800 border border-borderSubtle text-slate-300 transition cursor-pointer"
-                      title="Inspect message payload JSON"
-                    >
-                      JSON
-                    </button>
-                    <button 
-                      x-show="candidate.media_type" 
-                      @click="openMediaInspect(selectedChat.id, candidate.id, candidate.text)"
-                      class="px-2 py-1 text-[10px] font-mono rounded bg-sky-950 hover:bg-sky-900 border border-sky-800/60 text-sky-300 transition cursor-pointer"
-                    >
-                      Media
-                    </button>
-                  </div>
+                <h1 class="mt-3 max-w-4xl break-words text-[clamp(1.75rem,3vw,2.65rem)] sm:truncate font-semibold leading-tight tracking-[-.035em] text-white" x-text="selectedChat?.title || 'Archive'"></h1>
+                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+                  <span class="inline-flex items-center gap-2"><svg class="h-4 w-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 5h14v14H5zM8 9h8M8 13h8M8 17h5"/></svg><strong class="font-medium text-slate-300" x-text="(stats?.total_messages || selectedChat?.total_messages || 0).toLocaleString()"></strong> messages</span>
+                  <span class="inline-flex items-center gap-2"><svg class="h-4 w-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8"/><path stroke-linecap="round" d="M12 7v5l3 2"/></svg>Analyzed <strong class="font-medium text-slate-300" x-text="selectedChat?.last_scanned ? formatDate(selectedChat.last_scanned) : 'not yet'"></strong></span>
                 </div>
               </div>
-            </template>
-
-            <!-- Empty candidates state -->
-            <div x-show="filteredCandidates().length === 0" class="text-center py-12 text-slate-500 bg-surface rounded-lg border border-borderSubtle">
-              <p class="font-medium text-slate-400">No candidate messages match the criteria</p>
-              <p class="text-xs text-slate-500 mt-1">Run an audit scan or clear the active search filter.</p>
-            </div>
-          </div>
-
-          <!-- Pagination Bar -->
-          <div x-show="totalPages() > 1" class="flex items-center justify-between bg-surface p-3 rounded-lg border border-borderSubtle text-xs">
-            <button 
-              @click="prevPage()" 
-              :disabled="page === 1" 
-              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 cursor-pointer"
-            >
-              Previous
-            </button>
-            <span class="font-mono text-slate-400" x-text="`Page ${page} of ${totalPages()}`"></span>
-            <button 
-              @click="nextPage()" 
-              :disabled="page === totalPages()" 
-              class="px-3 py-1 rounded bg-surfaceElevated border border-borderSubtle disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800 cursor-pointer"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-
-        <!-- TAB 2: VISUAL DIFF STUDIO -->
-        <div x-show="activeTab === 'diffs'" class="space-y-4">
-          <div class="bg-surface p-4 rounded-lg border border-borderSubtle">
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Visual Variation and Caption Diffing</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Compares messages sharing identical media payloads with altered announcement captions or links.</p>
-          </div>
-
-          <template x-for="group in diffGroups" :key="group.group_id">
-            <div class="bg-surface rounded-lg border border-borderSubtle overflow-hidden">
-              <div class="p-3 bg-surfaceElevated border-b border-borderSubtle flex items-center justify-between">
-                <span class="text-xs font-mono text-slate-300 font-semibold" x-text="`Cluster: ${group.group_id}`"></span>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300" x-text="`${group.messages.length} media instances`"></span>
-              </div>
-
-              <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <template x-for="(msg, idx) in group.messages" :key="msg.id">
-                  <div 
-                    class="p-3.5 rounded-lg border flex flex-col justify-between space-y-3"
-                    :class="msg.id === group.suggested_keep_id ? 'bg-emerald-950/20 border-emerald-700/50' : 'bg-canvas border-borderSubtle'"
-                  >
-                    <div class="space-y-2">
-                      <div class="flex items-center justify-between">
-                        <span class="font-mono text-xs font-bold text-slate-200" x-text="`#${msg.id}`"></span>
-                        <span 
-                          class="text-[9px] font-mono px-1.5 py-0.2 rounded uppercase"
-                          :class="msg.id === group.suggested_keep_id ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50' : 'bg-surface text-slate-400 border border-borderSubtle'"
-                          x-text="msg.id === group.suggested_keep_id ? 'Primary Candidate' : 'Variant'"
-                        ></span>
-                      </div>
-                      <p class="text-xs text-slate-300 break-words font-sans" x-text="msg.text || '[No caption text]'"></p>
-                    </div>
-
-                    <div class="flex items-center justify-between pt-2 border-t border-borderSubtle text-[11px] font-mono text-slate-400">
-                      <span x-text="formatDate(msg.date)"></span>
-                      <span x-text="formatBytes(msg.file_size || 0)"></span>
-                    </div>
-                  </div>
-                </template>
-              </div>
-
-              <!-- Retention Preset Selector Bar -->
-              <div class="px-4 py-2.5 bg-surfaceElevated/50 border-t border-borderSubtle flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <span class="text-slate-400">Retention policy for cluster:</span>
-                <div class="flex items-center space-x-1.5">
-                  <button 
-                    @click="setGroupPreset(group.group_id, 'KEEP_NEWEST')" 
-                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
-                  >
-                    Keep Newest
-                  </button>
-                  <button 
-                    @click="setGroupPreset(group.group_id, 'KEEP_OLDEST')" 
-                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
-                  >
-                    Keep Oldest
-                  </button>
-                  <button 
-                    @click="setGroupPreset(group.group_id, 'KEEP_LONGEST_CAPTION')" 
-                    class="px-2 py-1 rounded text-[11px] font-mono bg-surface border border-borderSubtle hover:border-slate-600 text-slate-200 transition cursor-pointer"
-                  >
-                    Keep Longest Caption
-                  </button>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div x-show="diffGroups.length === 0" class="text-center py-12 text-slate-500 bg-surface rounded-lg border border-borderSubtle">
-            <p class="font-medium text-slate-400">No media caption variations detected</p>
-            <p class="text-xs text-slate-500 mt-1">Audit the archive or import new messages to populate the comparison deck.</p>
-          </div>
-        </div>
-
-        <!-- TAB 3: CRYPTOGRAPHIC BACKUP LEDGER -->
-        <div x-show="activeTab === 'backups'" class="space-y-4">
-          <div class="bg-surface p-4 rounded-lg border border-borderSubtle flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 class="text-xs font-bold text-white uppercase tracking-wider font-mono">Cryptographic Backup Ledger</h3>
-              <p class="text-xs text-slate-400 mt-0.5">Every deletion writes a verified SHA-256 JSON snapshot prior to modifying data.</p>
-            </div>
-            <button 
-              @click="loadBackups()" 
-              class="px-2.5 py-1 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white transition cursor-pointer self-start sm:self-auto"
-            >
-              Refresh Ledger
-            </button>
-          </div>
-
-          <div class="overflow-x-auto bg-surface rounded-lg border border-borderSubtle">
-            <table class="w-full text-left text-xs text-slate-300">
-              <thead class="bg-surfaceElevated text-[11px] font-mono text-slate-400 border-b border-borderSubtle uppercase">
-                <tr>
-                  <th class="py-2.5 px-3 font-semibold">Archive File</th>
-                  <th class="py-2.5 px-3 font-semibold">Created</th>
-                  <th class="py-2.5 px-3 font-semibold">Messages</th>
-                  <th class="py-2.5 px-3 font-semibold">SHA-256 Checksum</th>
-                  <th class="py-2.5 px-3 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-borderSubtle">
-                <template x-for="b in backups" :key="b.filename">
-                  <tr class="hover:bg-surfaceElevated/50 transition">
-                    <td class="py-2.5 px-3 font-mono font-medium text-slate-200 truncate max-w-[200px]" x-text="b.filename"></td>
-                    <td class="py-2.5 px-3 text-slate-400" x-text="formatDate(b.created_at)"></td>
-                    <td class="py-2.5 px-3 font-mono" x-text="b.message_count"></td>
-                    <td class="py-2.5 px-3">
-                      <div class="flex items-center space-x-1.5 font-mono text-[11px] text-slate-400">
-                        <span class="truncate max-w-[120px]" x-text="b.sha256"></span>
-                        <button 
-                          @click="copyToClipboard(b.sha256, 'SHA-256')" 
-                          class="p-0.5 text-slate-500 hover:text-slate-300 cursor-pointer"
-                          title="Copy Full Checksum"
-                        >
-                          <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td class="py-2.5 px-3 text-right">
-                      <div class="flex items-center justify-end space-x-1.5">
-                        <button 
-                          @click="verifyBackupChecksum(b)" 
-                          class="px-2 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800/60 text-emerald-300 font-mono text-[10px] transition cursor-pointer"
-                        >
-                          Verify
-                        </button>
-                        <button 
-                          @click="openCloudExport(b)" 
-                          class="px-2 py-0.5 rounded bg-sky-950/60 hover:bg-sky-900 border border-sky-800/60 text-sky-300 font-mono text-[10px] transition cursor-pointer"
-                        >
-                          Offsite
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="backups.length === 0">
-                  <td colspan="5" class="py-8 text-center text-slate-500">
-                    No pre-deletion backups recorded yet. Backups are created automatically before any deletion.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- TAB 4: MTPROTO & SETTINGS CONSOLE -->
-        <div x-show="activeTab === 'auth'" class="space-y-4">
-          <div class="bg-surface p-4 sm:p-5 rounded-lg border border-borderSubtle space-y-4">
-            <div>
-              <h3 class="text-sm font-bold text-white">Telegram MTProto Connection & Network Proxy</h3>
-              <p class="text-xs text-slate-400 mt-1">Configure your API credentials from my.telegram.org and setup an optional network proxy.</p>
-            </div>
-
-            <!-- Credentials Section -->
-            <div class="space-y-3 pt-2">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-[11px] font-mono text-slate-400 mb-1">Telegram API ID</label>
-                  <input 
-                    type="text" 
-                    x-model="authApiId" 
-                    placeholder="e.g. 12345678" 
-                    class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  >
-                </div>
-                <div>
-                  <label class="block text-[11px] font-mono text-slate-400 mb-1">Telegram API Hash</label>
-                  <input 
-                    type="password" 
-                    x-model="authApiHash" 
-                    placeholder="32-character hexadecimal hash" 
-                    class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
-                  >
-                </div>
-              </div>
-
-              <!-- Proxy Settings -->
-              <div class="pt-2 border-t border-borderSubtle space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-slate-300">Network Proxy (Optional)</span>
-                  <span class="text-[10px] font-mono text-slate-500">SOCKS5, HTTP, or MTProxy</span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Proxy Type</label>
-                    <select 
-                      x-model="authProxyType" 
-                      class="w-full bg-canvas border border-borderSubtle rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                      <option value="">Direct (No Proxy)</option>
-                      <option value="socks5">SOCKS5</option>
-                      <option value="http">HTTP</option>
-                      <option value="mtproxy">MTProxy</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Host / IP</label>
-                    <input 
-                      type="text" 
-                      x-model="authProxyHost" 
-                      placeholder="127.0.0.1" 
-                      class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-mono text-slate-400 mb-1">Port</label>
-                    <input 
-                      type="text" 
-                      x-model="authProxyPort" 
-                      placeholder="1080" 
-                      class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                  </div>
-                </div>
-              </div>
-
-              <div class="pt-3 flex justify-end">
-                <button 
-                  @click="saveCredentials()" 
-                  :disabled="authLoading"
-                  class="px-4 py-2 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                >
-                  Save Configuration
+              <div class="flex shrink-0 items-center gap-2">
+                <button @click="runScan()" :disabled="scanning || apiAuthRequired" class="inline-flex h-11 items-center gap-2 rounded-2xl bg-white/[.065] px-4 text-sm font-semibold text-slate-100 shadow-[0_8px_24px_rgba(0,0,0,.14)] ring-1 ring-white/[.07] hover:bg-white/[.09] disabled:cursor-not-allowed disabled:opacity-40">
+                  <svg class="h-4 w-4 text-blue-300" :class="scanning ? 'animate-spin' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 11a8 8 0 10-2.3 5.7M20 5v6h-6"/></svg>
+                  <span x-text="scanning ? 'Analyzing…' : 'Run analysis'"></span>
                 </button>
               </div>
             </div>
-          </div>
+
+            <div class="relative z-[1] mt-7 grid gap-3 xl:grid-cols-[1.35fr_.95fr]">
+              <button @click="filterByKpi('candidates')" class="metric-sheen relative min-h-[178px] overflow-hidden rounded-[22px] border border-blue-300/[.10] bg-gradient-to-br from-blue-500/[.13] via-[#111b31] to-[#101829] p-5 text-left shadow-[0_20px_50px_rgba(7,19,42,.18)] sm:p-6">
+                <div class="absolute right-[-3rem] top-[-4.5rem] h-44 w-44 rounded-full border border-blue-300/[.08] bg-blue-400/[.05]"></div>
+                <div class="relative flex h-full flex-col justify-between gap-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <div class="flex items-center gap-2 text-xs font-semibold text-blue-100/80"><span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-400/10 text-blue-300 ring-1 ring-blue-300/10"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 5h12M6 12h12M6 19h7"/></svg></span>Results</div>
+                      <div class="mono-value mt-3 text-4xl font-semibold tracking-[-.045em] text-white sm:text-5xl" x-text="candidates.length.toLocaleString()"></div>
+                    </div>
+                    <span class="rounded-full bg-blue-300/[.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.12em] text-blue-200 ring-1 ring-blue-300/10">Nothing auto-selected</span>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span class="rounded-full bg-emerald-400/[.07] px-2.5 py-1 text-emerald-200 ring-1 ring-emerald-400/10"><strong class="font-semibold" x-text="readyCount()"></strong> ready to stage</span>
+                    <span class="rounded-full bg-violet-400/[.07] px-2.5 py-1 text-violet-200 ring-1 ring-violet-400/10"><strong class="font-semibold" x-text="reviewOnlyCount()"></strong> need approval</span>
+                    <span class="text-slate-500">Nothing is staged automatically</span>
+                  </div>
+                </div>
+              </button>
+
+              <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                <div class="panel-soft rounded-[20px] p-4 sm:p-5">
+                  <div class="flex items-center justify-between gap-3"><span class="text-[11px] font-medium text-slate-500">Estimated space</span><span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-400/[.07] text-emerald-300"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 7h14M8 7V5h8v2m-9 3v8h10v-8"/></svg></span></div>
+                  <div class="mono-value mt-2 text-2xl font-semibold tracking-tight text-emerald-200" x-text="formatBytes(statValue('estimated_reclaimable_bytes'))"></div>
+                  <div class="mt-1 text-[11px] text-slate-600">Ready to stage</div>
+                </div>
+                <button @click="filterByKpi('exact')" class="panel-soft rounded-[20px] p-4 text-left hover:bg-white/[.04] sm:p-5">
+                  <div class="flex items-center justify-between gap-3"><span class="text-[11px] font-medium text-slate-500">Duplicate matches</span><span class="h-2 w-2 rounded-full bg-blue-400 status-dot"></span></div>
+                  <div class="mono-value mt-2 text-2xl font-semibold tracking-tight text-blue-200" x-text="categoryCount('exact').toLocaleString()"></div>
+                  <div class="mt-1 text-[11px] text-slate-600">Exact + similar matches</div>
+                </button>
+                <button @click="filterByKpi('diff')" class="panel-soft rounded-[20px] p-4 text-left hover:bg-white/[.04] sm:p-5">
+                  <div class="flex items-center justify-between gap-3"><span class="text-[11px] font-medium text-slate-500">Changed copies</span><span class="h-2 w-2 rounded-full bg-violet-400 status-dot"></span></div>
+                  <div class="mono-value mt-2 text-2xl font-semibold tracking-tight text-violet-200" x-text="categoryCount('diff').toLocaleString()"></div>
+                  <div class="mt-1 text-[11px] text-slate-600">Caption/media variations</div>
+                </button>
+              </div>
+            </div>
+
+            <div class="relative z-[1] mt-4 rounded-[20px] border border-white/[.055] bg-black/[.12] px-4 py-4 sm:px-5">
+              <div class="mb-4 flex items-center justify-between gap-3">
+                <div><p class="text-[11px] font-semibold text-slate-200">Cleanup steps</p><p class="mt-1 text-[10px] text-slate-600">Review and staging do not change Telegram. A backup is required before deletion.</p></div>
+                <span class="hidden items-center gap-1.5 rounded-full bg-emerald-400/[.055] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[.1em] text-emerald-300 ring-1 ring-emerald-400/10 sm:inline-flex"><svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m7 12 3 3 7-7"/></svg>Backup required</span>
+              </div>
+              <div class="workflow-line mobile-scroll grid grid-cols-5 gap-2 overflow-x-auto pb-1 sm:gap-3">
+                <template x-for="step in [
+                  {n:'01',label:'Analyze',state:stats ? 'Complete' : 'Ready',kind:stats ? 'complete' : 'current'},
+                  {n:'02',label:'Review',state:candidates.length ? candidates.length + ' results' : 'Waiting',kind:stats && candidates.length ? 'current' : 'pending'},
+                  {n:'03',label:'Stage',state:selectedCandidateIds.length ? selectedCandidateIds.length + ' staged' : 'Manual',kind:selectedCandidateIds.length ? 'current' : 'pending'},
+                  {n:'04',label:'Simulate',state:'Recommended',kind:'pending'},
+                  {n:'05',label:'Delete',state:'Final action',kind:'pending'}
+                ]" :key="step.n">
+                  <div class="workflow-node text-center" :class="step.kind==='complete' ? 'is-complete' : (step.kind==='current' ? 'is-current' : '')">
+                    <div class="workflow-node-dot" x-text="step.n"></div>
+                    <div class="mt-2 text-[10px] font-semibold" :class="step.kind==='complete' ? 'text-emerald-200' : (step.kind==='current' ? 'text-blue-200' : 'text-slate-500')" x-text="step.label"></div>
+                    <div class="mt-0.5 truncate text-[8px] text-slate-600" x-text="step.state"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+
+          <!-- Tabs -->
+          <section>
+            <div class="mobile-edge panel flex items-center gap-1 overflow-x-auto rounded-2xl p-1.5 scrollbar-none" role="tablist" aria-label="Archive sections">
+              <button @click="activeTab='candidates'" class="tab-pill inline-flex shrink-0 items-center gap-2 px-3.5 text-xs font-semibold sm:text-sm" :class="activeTab==='candidates' ? 'is-active' : ''"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 6h14M5 12h9M5 18h11"/></svg>Review <span class="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] text-slate-400" x-text="candidates.length"></span></button>
+              <button @click="activeTab='diffs'" class="tab-pill inline-flex shrink-0 items-center gap-2 px-3.5 text-xs font-semibold sm:text-sm" :class="activeTab==='diffs' ? 'is-active' : ''"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 7h11l-3-3m3 3-3 3M16 17H5l3 3m-3-3 3-3"/></svg>Compare <span class="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] text-slate-400" x-text="diffGroups.length"></span></button>
+              <button @click="activeTab='backups'" class="tab-pill inline-flex shrink-0 items-center gap-2 px-3.5 text-xs font-semibold sm:text-sm" :class="activeTab==='backups' ? 'is-active' : ''"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 5h12v14H6zM9 8h6M9 12h6"/></svg>Backups <span class="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] text-slate-400" x-text="backups.length"></span></button>
+              <button @click="activeTab='auth'" class="tab-pill inline-flex shrink-0 items-center gap-2 px-3.5 text-xs font-semibold sm:text-sm" :class="activeTab==='auth' ? 'is-active' : ''"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 15v2m-5 4h10a2 2 0 002-2v-8a2 2 0 00-2-2h-1V7a4 4 0 00-8 0v2H7a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Connection <span class="h-1.5 w-1.5 rounded-full" :class="telegramAuth ? 'bg-emerald-400' : 'bg-slate-600'"></span></button>
+            </div>
+
+            <!-- REVIEW -->
+            <div x-show="activeTab==='candidates'" class="pt-5">
+              <div class="panel mb-4 rounded-[18px] p-3 sm:p-3.5">
+                <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <label class="relative min-w-0 flex-1 xl:max-w-[390px]">
+                    <span class="sr-only">Search results</span>
+                    <svg class="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+                    <input id="candidateSearchInput" x-model="searchQuery" @input="page=1" type="search" placeholder="Search message, reason, or ID" class="input-field h-10 w-full rounded-xl pl-9 pr-3 text-[12px] text-slate-200 placeholder:text-slate-600">
+                  </label>
+                  <div class="flex min-w-0 flex-1 gap-1 overflow-x-auto xl:justify-center">
+                    <button @click="candidateFilter='all'; page=1" class="filter-chip" :class="candidateFilter==='all' ? 'is-active' : ''">All <span class="text-[9px] opacity-60" x-text="candidates.length"></span></button>
+                    <button @click="candidateFilter='exact'; page=1" class="filter-chip" :class="candidateFilter==='exact' ? 'is-active' : ''">Duplicates <span class="text-[9px] opacity-60" x-text="categoryCount('exact')"></span></button>
+                    <button @click="candidateFilter='diff'; page=1" class="filter-chip" :class="candidateFilter==='diff' ? 'is-active' : ''">Variants <span class="text-[9px] opacity-60" x-text="categoryCount('diff')"></span></button>
+                    <button @click="candidateFilter='link'; page=1" class="filter-chip" :class="candidateFilter==='link' ? 'is-active' : ''">Links <span class="text-[9px] opacity-60" x-text="categoryCount('link')"></span></button>
+                    <button @click="candidateFilter='policy'; page=1" class="filter-chip" :class="candidateFilter==='policy' ? 'is-active' : ''">Policy <span class="text-[9px] opacity-60" x-text="categoryCount('policy')"></span></button>
+                  </div>
+                  <div class="flex shrink-0 items-center justify-between gap-2 border-t border-white/[.05] pt-3 xl:border-0 xl:pt-0">
+                    <span class="mr-1 text-[10px] text-slate-600"><strong class="font-semibold text-slate-300" x-text="selectedCandidateIds.length"></strong> staged</span>
+                    <button @click="selectAllCandidates()" :disabled="readyFilteredCandidates().length===0" class="rounded-xl bg-white/[.05] px-3 py-2 text-[10px] font-semibold text-slate-300 ring-1 ring-white/[.055] hover:bg-white/[.075] disabled:opacity-35">Stage ready</button>
+                    <button @click="deselectAllCandidates()" :disabled="selectedCandidateIds.length===0" class="rounded-xl px-2.5 py-2 text-[10px] font-medium text-slate-600 hover:bg-white/[.035] hover:text-slate-300 disabled:opacity-35">Clear</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <template x-for="c in paginatedCandidates()" :key="c.id">
+                  <article class="candidate-card group rounded-[20px] p-3.5 transition sm:p-4" :class="selectedCandidateIds.includes(c.id) ? 'is-staged' : ''">
+                    <span class="accent" :class="{
+                      'bg-blue-400': candidateTone(c)==='sky',
+                      'bg-violet-400': candidateTone(c)==='violet',
+                      'bg-amber-400': candidateTone(c)==='amber',
+                      'bg-rose-400': candidateTone(c)==='rose'
+                    }"></span>
+                    <div class="flex gap-3.5 sm:gap-4">
+                      <div class="hidden shrink-0 sm:block">
+                        <button x-show="c.media_type" @click="openMediaInspect(c.chat_id, c.id, 'Message #' + c.id + ' media')" class="media-well" title="Preview message media">
+                          <svg x-show="c.media_type==='photo'" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M9 9h.01"/></svg>
+                          <svg x-show="c.media_type!=='photo'" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M7 3h7l4 4v14H7zM14 3v5h5"/></svg>
+                        </button>
+                        <div x-show="!c.media_type" class="media-well"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M5 5h14v14H5zM8 9h8M8 13h6"/></svg></div>
+                      </div>
+
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                              <span class="rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[.11em] ring-1"
+                                    :class="{
+                                      'bg-blue-400/[.08] text-blue-300 ring-blue-400/15': candidateTone(c)==='sky',
+                                      'bg-violet-400/[.08] text-violet-300 ring-violet-400/15': candidateTone(c)==='violet',
+                                      'bg-amber-400/[.08] text-amber-300 ring-amber-400/15': candidateTone(c)==='amber',
+                                      'bg-rose-400/[.08] text-rose-300 ring-rose-400/15': candidateTone(c)==='rose'
+                                    }" x-text="candidateLabel(c)"></span>
+                              <span class="rounded-full px-2 py-1 text-[9px] font-semibold ring-1" :class="candidateEligible(c) ? 'bg-emerald-400/[.065] text-emerald-300 ring-emerald-400/10' : 'bg-violet-400/[.055] text-violet-300 ring-violet-400/10'" x-text="candidateStatusLabel(c)"></span>
+                              <span class="font-mono text-[10px] text-slate-600" x-text="'#' + c.id"></span>
+                              <span class="text-[10px] text-slate-600" x-text="formatDate(c.date)"></span>
+                            </div>
+                            <p class="mt-2.5 max-w-4xl break-words text-[13px] leading-6 text-slate-200 sm:text-sm" x-text="c.text || '(no message text)'"></p>
+                          </div>
+                          <div class="flex shrink-0 items-center gap-4 lg:flex-col lg:items-end lg:gap-1">
+                            <div class="mono-value text-[11px] font-semibold text-slate-300" x-text="formatBytes(c.file_size || 0)"></div>
+                            <div class="text-[9px] uppercase tracking-[.12em] text-slate-600" x-text="c.media_type || 'text'"></div>
+                          </div>
+                        </div>
+
+                        <div class="reason-panel mt-3 flex flex-col gap-3 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="flex min-w-0 items-start gap-2.5 text-[11px] leading-5 text-slate-500">
+                            <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full" :class="candidateEligible(c) ? 'bg-emerald-400/[.06] text-emerald-300' : 'bg-violet-400/[.06] text-violet-300'"><svg class="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="M12 11v5M12 8h.01"/></svg></span>
+                            <span x-text="c.reason || 'No reason provided'"></span>
+                          </div>
+                          <div class="flex shrink-0 items-center gap-2">
+                            <div class="hidden items-center gap-2 text-[9px] text-slate-600 sm:flex" title="Match score"><span x-text="candidateScore(c)"></span><div class="score-track"><div class="score-fill" :style="'width:' + candidateScore(c)"></div></div></div>
+                            <button @click="openRawInspector(c)" class="rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-slate-500 hover:bg-white/[.045] hover:text-slate-200">Details</button>
+                          </div>
+                        </div>
+
+                        <div class="mt-3 flex flex-col gap-2 border-t border-white/[.045] pt-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p class="text-[10px] leading-4" :class="candidateEligible(c) ? 'text-emerald-300/60' : 'text-slate-600'" x-text="candidateEligible(c) ? 'Ready to stage. Nothing changes until you select it.' : 'Needs approval before it can be staged.'"></p>
+                          <div class="flex shrink-0 items-center gap-1.5">
+                            <button x-show="!candidateEligible(c)" @click="setResultApproval(c, true)" class="rounded-xl bg-white/[.05] px-3 py-2 text-[10px] font-semibold text-slate-300 ring-1 ring-white/[.055] hover:bg-white/[.075]">Approve</button>
+                            <button x-show="candidateEligible(c) && !selectedCandidateIds.includes(c.id)" @click="stageCandidate(c)" class="rounded-xl bg-blue-500/[.10] px-3 py-2 text-[10px] font-semibold text-blue-200 ring-1 ring-blue-400/15 hover:bg-blue-500/[.16]">Stage</button>
+                            <button x-show="candidateEligible(c) && selectedCandidateIds.includes(c.id)" @click="unstageCandidate(c)" class="rounded-xl bg-emerald-400/[.07] px-3 py-2 text-[10px] font-semibold text-emerald-200 ring-1 ring-emerald-400/12 hover:bg-emerald-400/[.11]">Staged</button>
+                            <button x-show="candidateEligible(c)" @click="setResultApproval(c, false)" class="rounded-xl px-2.5 py-2 text-[10px] font-medium text-slate-600 hover:bg-white/[.035] hover:text-slate-300" title="Require approval again">Require approval</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </template>
+
+                <div x-show="filteredCandidates().length===0" class="rounded-2xl bg-panel/60 px-5 py-14 text-center ring-1 ring-white/[.05]">
+                  <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-400/[.08] text-emerald-300">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m5 12 4 4L19 6"/></svg>
+                  </div>
+                  <p class="mt-3 text-sm font-medium text-slate-300">No matching results</p>
+                  <p class="mt-1 text-xs text-slate-600">Try another filter, or run analysis again.</p>
+                </div>
+              </div>
+
+              <div x-show="filteredCandidates().length>pageSize" class="mt-4 flex items-center justify-between text-xs text-slate-500">
+                <span x-text="'Page ' + page + ' of ' + totalPages()"></span>
+                <div class="flex gap-1">
+                  <button @click="prevPage()" :disabled="page<=1" class="rounded-lg bg-white/[.04] px-3 py-2 hover:bg-white/[.07] disabled:opacity-30">Previous</button>
+                  <button @click="nextPage()" :disabled="page>=totalPages()" class="rounded-lg bg-white/[.04] px-3 py-2 hover:bg-white/[.07] disabled:opacity-30">Next</button>
+                </div>
+              </div>
+
+              <!-- staged action tray -->
+              <div x-show="selectedCandidateIds.length>0" class="staged-tray sticky bottom-4 z-30 mt-5 rounded-[20px] p-3.5" x-transition>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="flex items-center gap-3 px-1">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/[.10] text-sm font-bold text-blue-200 ring-1 ring-blue-300/10" x-text="selectedCandidateIds.length"></div>
+                    <div>
+                      <p class="text-sm font-semibold text-white">Ready to continue</p>
+                      <p class="mt-0.5 text-xs text-slate-500"><span x-text="formatBytes(selectedCandidatesBytes())"></span> staged. Nothing has been deleted.</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="openDeleteReview(false)" class="flex-1 rounded-xl bg-gradient-to-b from-blue-500 to-blue-600 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.18)] ring-1 ring-blue-300/15 hover:from-blue-400 hover:to-blue-500 sm:flex-none">Run simulation</button>
+                    <button @click="openDeleteReview(true)" class="flex-1 rounded-xl bg-rose-400/[.055] px-4 py-2.5 text-[12px] font-semibold text-rose-200 ring-1 ring-rose-400/12 hover:bg-rose-400/[.09] sm:flex-none">Review deletion</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- COMPARE -->
+            <div x-show="activeTab==='diffs'" class="space-y-4 pt-5">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 class="text-base font-semibold text-white">Compare duplicate groups</h2>
+                  <p class="mt-1 text-xs leading-5 text-slate-500">Review all copies, including the one currently kept, before changing the retention rule.</p>
+                </div>
+                <span class="text-xs text-slate-600" x-text="diffGroups.length + ' groups'"></span>
+              </div>
+
+              <template x-for="g in diffGroups" :key="g.group_id">
+                <article class="panel rounded-[22px] p-4 sm:p-5">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-violet-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-300 ring-1 ring-violet-400/20" x-text="(g.group_type || 'duplicate').replaceAll('_',' ')"></span>
+                        <span class="font-mono text-[10px] text-slate-600" x-text="g.group_id"></span>
+                      </div>
+                      <p class="mt-2 text-xs text-slate-500"><strong class="font-medium text-slate-300" x-text="g.messages.length"></strong> copies · current keeper <strong class="font-mono font-medium text-emerald-300" x-text="'#' + (g.primary_message_id || g.suggested_keep_id || '—')"></strong></p>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button @click="setGroupPreset(g.group_id, 'KEEP_NEWEST')" class="rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1" :class="g.recommended_preset==='KEEP_NEWEST' ? 'bg-blue-500/15 text-blue-200 ring-blue-400/25' : 'bg-white/[.03] text-slate-400 ring-white/[.06] hover:bg-white/[.06]'">Newest</button>
+                      <button @click="setGroupPreset(g.group_id, 'KEEP_OLDEST')" class="rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1" :class="g.recommended_preset==='KEEP_OLDEST' ? 'bg-blue-500/15 text-blue-200 ring-blue-400/25' : 'bg-white/[.03] text-slate-400 ring-white/[.06] hover:bg-white/[.06]'">Oldest</button>
+                      <button @click="setGroupPreset(g.group_id, 'KEEP_LONGEST')" class="rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1" :class="g.recommended_preset==='KEEP_LONGEST' ? 'bg-blue-500/15 text-blue-200 ring-blue-400/25' : 'bg-white/[.03] text-slate-400 ring-white/[.06] hover:bg-white/[.06]'">Longest</button>
+                      <button @click="setGroupPreset(g.group_id, 'WHITELIST_ALL')" class="rounded-lg px-2.5 py-1.5 text-[11px] font-medium ring-1" :class="g.recommended_preset==='WHITELIST_ALL' ? 'bg-emerald-500/15 text-emerald-200 ring-emerald-400/25' : 'bg-white/[.03] text-slate-400 ring-white/[.06] hover:bg-white/[.06]'">Keep all</button>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-3" :class="g.messages.length>2 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'">
+                    <template x-for="m in g.messages" :key="m.id">
+                      <div class="rounded-xl p-4 ring-1" :class="m.id===g.primary_message_id ? 'bg-emerald-400/[.055] ring-emerald-400/20' : 'bg-black/10 ring-white/[.055]'">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-mono text-[11px] text-slate-500" x-text="'#' + m.id"></span>
+                          <span x-show="m.id===g.primary_message_id" class="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">Keeper</span>
+                        </div>
+                        <p class="mt-3 break-words text-sm leading-6 text-slate-200" x-text="m.text || '(no text)'"></p>
+                        <div class="mt-4 flex items-center justify-between border-t border-white/[.05] pt-3 text-[11px] text-slate-600">
+                          <span x-text="formatDate(m.date)"></span>
+                          <span x-text="formatBytes(m.file_size || 0)"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </article>
+              </template>
+
+              <div x-show="diffGroups.length===0" class="rounded-2xl bg-panel/60 px-5 py-14 text-center ring-1 ring-white/[.05]">
+                <p class="text-sm font-medium text-slate-300">No duplicate groups to compare</p>
+                <p class="mt-1 text-xs text-slate-600">Run analysis to show each kept copy next to the other copies.</p>
+              </div>
+            </div>
+
+            <!-- BACKUPS -->
+            <div x-show="activeTab==='backups'" class="space-y-4 pt-5">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 class="text-base font-semibold text-white">Backups</h2>
+                  <p class="mt-1 text-xs leading-5 text-slate-500">Only checksum-valid snapshots are listed. Every deletion run creates and verifies a snapshot first.</p>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <template x-for="b in backups" :key="b.filename">
+                  <article class="panel panel-interactive rounded-[20px] p-4 sm:p-5">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div class="flex min-w-0 items-start gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/[.065] text-emerald-300 ring-1 ring-emerald-400/10"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4"/></svg></div>
+                        <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><div class="max-w-xl truncate text-sm font-semibold text-slate-100" x-text="b.filename"></div><span class="rounded-full bg-emerald-400/[.065] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[.11em] text-emerald-300 ring-1 ring-emerald-400/10">Verified</span></div><div class="mt-1 text-[11px] text-slate-600" x-text="formatDate(b.created_at)"></div></div>
+                      </div>
+                      <div class="grid grid-cols-3 gap-2 lg:w-[430px]">
+                        <div class="rounded-xl bg-black/[.12] px-3 py-2.5 ring-1 ring-white/[.035]"><div class="text-[9px] uppercase tracking-[.1em] text-slate-700">Messages</div><div class="mono-value mt-1 text-xs font-semibold text-slate-300" x-text="b.message_count"></div></div>
+                        <div class="rounded-xl bg-black/[.12] px-3 py-2.5 ring-1 ring-white/[.035]"><div class="text-[9px] uppercase tracking-[.1em] text-slate-700">Size</div><div class="mono-value mt-1 text-xs font-semibold text-slate-300" x-text="formatBytes(b.size_bytes)"></div></div>
+                        <button @click="copyToClipboard(b.sha256, 'SHA-256')" class="rounded-xl bg-black/[.12] px-3 py-2.5 text-left ring-1 ring-white/[.035] hover:bg-white/[.035]"><div class="text-[9px] uppercase tracking-[.1em] text-slate-700">SHA-256</div><div class="mt-1 truncate font-mono text-[10px] font-medium text-emerald-300" x-text="b.sha256"></div></button>
+                      </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap items-center justify-end gap-1.5 border-t border-white/[.045] pt-3"><button @click="verifyBackupChecksum(b)" class="rounded-lg bg-emerald-400/[.055] px-3 py-1.5 text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-400/10 hover:bg-emerald-400/[.09]">Verify</button><button @click="downloadBackup(b)" class="rounded-lg px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-white/[.045] hover:text-slate-200">Download</button><button @click="openCloudExport(b)" class="rounded-lg px-3 py-1.5 text-[11px] font-semibold text-slate-400 hover:bg-white/[.045] hover:text-slate-200">Upload copy</button></div>
+                  </article>
+                </template>
+                <div x-show="backups.length===0" class="panel rounded-[22px] px-5 py-14 text-center"><div class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-400/[.055] text-emerald-300 ring-1 ring-emerald-400/10"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M6 4h12v16H6zM9 9h6M9 13h4"/></svg></div><p class="mt-3 text-sm font-semibold text-slate-300">No backups yet</p><p class="mt-1 text-xs text-slate-600">Run a simulation to create a backup without deleting anything.</p></div>
+              </div>
+            </div>
+
+            <!-- CONNECTION -->
+            <div x-show="activeTab==='auth'" class="pt-5">
+              <section class="panel mb-4 rounded-[22px] p-4 sm:p-5">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><p class="text-[10px] font-bold uppercase tracking-[.14em] text-slate-600">Connection status</p><h2 class="mt-1 text-base font-semibold text-white">Local service and Telegram login</h2><p class="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Imported archives can be reviewed offline. Telegram login is required only for live account actions.</p></div><div class="grid grid-cols-3 gap-2 lg:w-[430px]"><div class="rounded-xl bg-black/[.12] p-3 ring-1 ring-white/[.04]"><div class="text-[9px] text-slate-600">API</div><div class="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300"><span class="h-1.5 w-1.5 rounded-full" :class="apiAuthRequired ? 'bg-amber-400' : 'bg-emerald-400'"></span><span x-text="apiAuthRequired ? 'Locked' : 'Ready'"></span></div></div><div class="rounded-xl bg-black/[.12] p-3 ring-1 ring-white/[.04]"><div class="text-[9px] text-slate-600">Telegram</div><div class="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300"><span class="h-1.5 w-1.5 rounded-full" :class="telegramAuth ? 'bg-emerald-400' : 'bg-slate-600'"></span><span x-text="telegramAuth ? 'Connected' : 'Offline'"></span></div></div><div class="rounded-xl bg-black/[.12] p-3 ring-1 ring-white/[.04]"><div class="text-[9px] text-slate-600">Route</div><div class="mt-1 truncate text-[11px] font-semibold text-slate-300" x-text="relayConfigured ? relayProvider : 'Direct'"></div></div></div></div>
+              </section>
+              <div class="grid gap-4 lg:grid-cols-2">
+              <div class="space-y-4">
+                <section class="panel rounded-[22px] p-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div><h2 class="text-base font-semibold text-white">Dashboard API access</h2><p class="mt-1 text-xs leading-5 text-slate-500">Needed only when the local service is configured with <code class="font-mono text-slate-400">API_TOKEN</code>. Stored in this browser only.</p></div>
+                    <span class="mt-0.5 h-2 w-2 shrink-0 rounded-full" :class="apiAuthRequired ? 'bg-amber-400' : 'bg-emerald-400'"></span>
+                  </div>
+                  <div class="mt-4 flex gap-2">
+                    <input x-model="apiToken" type="password" autocomplete="off" placeholder="Paste API token" class="h-10 min-w-0 flex-1 rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50">
+                    <button @click="saveApiToken()" class="rounded-xl bg-white/[.06] px-4 text-xs font-semibold text-slate-200 hover:bg-white/[.09]">Save</button>
+                  </div>
+                </section>
+
+                <section class="panel rounded-[22px] p-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div><h2 class="text-base font-semibold text-white">Telegram session</h2><p class="mt-1 text-xs leading-5 text-slate-500">Required for live Telegram reads and deletion. Simulations do not need an authenticated session.</p></div>
+                    <span class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ring-1" :class="telegramAuth ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/20' : 'bg-white/[.04] text-slate-500 ring-white/[.06]'" x-text="telegramAuth ? 'Connected' : 'Not connected'"></span>
+                  </div>
+
+                  <div x-show="telegramAuth" class="mt-4 rounded-xl bg-emerald-400/[.055] p-3 text-xs leading-5 text-emerald-100/75 ring-1 ring-emerald-400/15">This session is authorized. Live deletion will still require a verified backup, acknowledgement, and typed confirmation.</div>
+
+                  <div x-show="!telegramAuth" class="mt-4 space-y-3">
+                    <div x-show="authStep==='phone'">
+                      <label class="mb-1.5 block text-xs font-medium text-slate-400">Phone number</label>
+                      <div class="flex gap-2"><input x-model="authPhone" type="tel" autocomplete="tel" placeholder="+33…" class="h-10 min-w-0 flex-1 rounded-xl bg-black/15 px-3 text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"><button @click="sendAuthCode()" :disabled="authLoading" class="rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Send code</button></div>
+                    </div>
+                    <div x-show="authStep==='code'">
+                      <label class="mb-1.5 block text-xs font-medium text-slate-400">Telegram verification code</label>
+                      <div class="flex gap-2"><input x-model="authCode" @keydown.enter="verifyAuthCode()" inputmode="numeric" autocomplete="one-time-code" placeholder="12345" class="h-10 min-w-0 flex-1 rounded-xl bg-black/15 px-3 font-mono text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"><button @click="verifyAuthCode()" :disabled="authLoading || !authCode" class="rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Verify</button></div>
+                    </div>
+                    <div x-show="authStep==='2fa'">
+                      <label class="mb-1.5 block text-xs font-medium text-slate-400">Two-step verification password</label>
+                      <div class="flex gap-2"><input x-model="authPassword" @keydown.enter="check2faPassword()" type="password" autocomplete="current-password" placeholder="Cloud password" class="h-10 min-w-0 flex-1 rounded-xl bg-black/15 px-3 text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"><button @click="check2faPassword()" :disabled="authLoading || !authPassword" class="rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50">Connect</button></div>
+                    </div>
+                    <button x-show="authStep!=='phone'" @click="authStep='phone'; authCode=''; authPassword=''; phoneCodeHash=''" class="text-xs font-medium text-slate-500 hover:text-slate-300">Start over</button>
+                  </div>
+                </section>
+              </div>
+
+              <section class="panel rounded-[22px] p-5">
+                <div><h2 class="text-base font-semibold text-white">Telegram credentials & proxy</h2><p class="mt-1 text-xs leading-5 text-slate-500">Use your own MTProto API ID and hash. Proxy settings are optional and saved with the local service configuration.</p></div>
+                <div class="mt-5 space-y-4">
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">API ID</span><input x-model="authApiId" type="text" inputmode="numeric" placeholder="12345678" class="h-10 w-full rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"></label>
+                    <label class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">API hash</span><input x-model="authApiHash" type="password" autocomplete="off" placeholder="32-character hash" class="h-10 w-full rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"></label>
+                  </div>
+                  <div class="border-t border-white/[.05] pt-4">
+                    <div class="mb-3 flex items-center justify-between"><span class="text-xs font-semibold text-slate-300">Optional proxy</span><span class="text-[10px] text-slate-600" x-text="relayConfigured ? relayProvider : 'Direct network'"></span></div>
+                    <div class="grid gap-3 sm:grid-cols-3">
+                      <label class="block"><span class="mb-1.5 block text-[11px] text-slate-500">Type</span><select x-model="authProxyType" class="h-10 w-full rounded-xl bg-black/15 px-3 text-xs text-slate-300 ring-1 ring-white/[.07] focus:ring-blue-400/50"><option value="">Direct</option><option value="socks5">SOCKS5</option><option value="http">HTTP</option><option value="mtproxy">MTProxy</option></select></label>
+                      <label class="block"><span class="mb-1.5 block text-[11px] text-slate-500">Host</span><input x-model="authProxyHost" type="text" placeholder="127.0.0.1" class="h-10 w-full rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"></label>
+                      <label class="block"><span class="mb-1.5 block text-[11px] text-slate-500">Port</span><input x-model="authProxyPort" type="text" inputmode="numeric" placeholder="1080" class="h-10 w-full rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700 focus:ring-blue-400/50"></label>
+                    </div>
+                    <div x-show="authProxyType && authProxyType!=='mtproxy'" class="mt-3 grid gap-3 sm:grid-cols-2"><input x-model="authProxyUser" type="text" autocomplete="username" placeholder="Proxy username (optional)" class="h-10 rounded-xl bg-black/15 px-3 text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"><input x-model="authProxyPass" type="password" autocomplete="off" placeholder="Proxy password (optional)" class="h-10 rounded-xl bg-black/15 px-3 text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"></div>
+                    <div x-show="authProxyType==='mtproxy'" class="mt-3"><input x-model="authProxySecret" type="password" autocomplete="off" placeholder="MTProxy secret" class="h-10 w-full rounded-xl bg-black/15 px-3 font-mono text-xs text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"></div>
+                  </div>
+                  <div class="flex justify-end"><button @click="saveCredentials()" :disabled="authLoading" class="rounded-xl bg-white/[.07] px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/[.10] disabled:opacity-50">Save settings</button></div>
+                </div>
+              </section>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- MODAL: SAFE DELETION EXECUTION -->
-  <div 
-    x-show="showDeleteModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showDeleteModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-          <span>Execute Deletion Operation</span>
-        </h3>
-        <button @click="showDeleteModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
+  <!-- Deletion confirmation modal -->
+  <div x-show="showDeleteModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showDeleteModal=false; confirmDeleteAcknowledge=false; deleteConfirmationText=''" class="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-[24px] bg-[#0f182a] p-5 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10] sm:p-6" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+      <div class="flex items-start justify-between gap-4">
+        <div><p class="text-xs font-semibold uppercase tracking-[.14em] text-slate-600">Confirm cleanup</p><h2 id="delete-title" class="mt-1 text-xl font-semibold text-white" x-text="dryRunMode ? 'Simulate staged cleanup' : 'Review live deletion'"></h2></div>
+        <button @click="showDeleteModal=false; confirmDeleteAcknowledge=false; deleteConfirmationText=''" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white" aria-label="Close">×</button>
       </div>
 
-      <div class="space-y-3 text-xs text-slate-300">
-        <p>You have staged <strong class="text-rose-400 font-mono" x-text="selectedCandidateIds.length"></strong> messages for deletion.</p>
-        <p>Estimated reclaimable storage: <strong class="text-emerald-400 font-mono" x-text="formatBytes(selectedCandidatesBytes())"></strong>.</p>
-        
-        <div class="p-3 bg-canvas border border-borderSubtle rounded-md space-y-2">
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="checkbox" x-model="dryRunMode" class="rounded bg-surface border-borderStrong text-sky-600 focus:ring-sky-500 h-4 w-4">
-            <span class="font-medium text-slate-200">Dry-Run Simulation Mode</span>
-          </label>
-          <p class="text-[11px] text-slate-400 pl-6">When active, the pipeline validates actions and writes backups without deleting records from Telegram servers.</p>
-        </div>
-
-        <div x-show="!dryRunMode" class="p-3 bg-rose-950/20 border border-rose-800/40 rounded-md space-y-2">
-          <label class="flex items-start space-x-2 cursor-pointer">
-            <input type="checkbox" x-model="confirmDeleteAcknowledge" class="mt-0.5 rounded bg-surface border-borderStrong text-rose-600 focus:ring-rose-500 h-4 w-4">
-            <span class="text-[11px] text-rose-200">I confirm that a verified SHA-256 backup will be recorded to disk before these messages are removed.</span>
-          </label>
-        </div>
+      <div class="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-black/15 p-1 ring-1 ring-white/[.06]">
+        <button @click="dryRunMode=true; confirmDeleteAcknowledge=false; deleteConfirmationText=''" class="rounded-lg px-3 py-2.5 text-xs font-semibold" :class="dryRunMode ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-300'">Simulation</button>
+        <button @click="dryRunMode=false; confirmDeleteAcknowledge=false; deleteConfirmationText=''" class="rounded-lg px-3 py-2.5 text-xs font-semibold" :class="!dryRunMode ? 'bg-rose-500/15 text-rose-200 ring-1 ring-rose-400/20' : 'text-slate-500 hover:text-slate-300'">Live delete</button>
       </div>
 
-      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-borderSubtle">
-        <button 
-          @click="showDeleteModal = false" 
-          class="px-3 py-1.5 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer"
-        >
-          Cancel
-        </button>
-        <button 
-          @click="executeBatchDelete()" 
-          :disabled="deleting || (!dryRunMode && !confirmDeleteAcknowledge)"
-          class="px-4 py-1.5 text-xs font-semibold rounded bg-rose-600 hover:bg-rose-500 text-white transition active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <span x-text="deleting ? 'Processing...' : (dryRunMode ? 'Run Simulation' : 'Execute Deletion')"></span>
-        </button>
+      <div class="mt-5 grid grid-cols-2 gap-3">
+        <div class="rounded-xl bg-white/[.035] p-4"><div class="text-[11px] text-slate-500">Messages staged</div><div class="mt-1 text-xl font-semibold text-white" x-text="selectedCandidateIds.length"></div></div>
+        <div class="rounded-xl bg-white/[.035] p-4"><div class="text-[11px] text-slate-500">Estimated reclaim</div><div class="mt-1 text-xl font-semibold text-emerald-300" x-text="formatBytes(selectedCandidatesBytes())"></div></div>
       </div>
-    </div>
+
+      <div class="mt-4 rounded-xl bg-emerald-400/[.055] p-4 ring-1 ring-emerald-400/15">
+        <div class="flex gap-3"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 3 5 6v5c0 4.7 3 8.3 7 10 4-1.7 7-5.3 7-10V6l-7-3zM9 12l2 2 4-4"/></svg><div><p class="text-xs font-semibold text-emerald-100">Backup must complete first</p><p class="mt-1 text-[11px] leading-5 text-emerald-100/65">The backup must contain every selected message and pass its SHA-256 check before Telegram is changed.</p></div></div>
+      </div>
+
+      <div x-show="dryRunMode" class="mt-4 rounded-xl bg-blue-400/[.055] p-4 text-xs leading-5 text-blue-100/70 ring-1 ring-blue-400/15">Simulation checks the selected messages, creates and verifies a backup, and does not delete anything from Telegram.</div>
+
+      <div x-show="!dryRunMode" class="mt-4 space-y-4">
+        <div x-show="!telegramAuth && !isOfflineMode" class="rounded-xl bg-amber-400/[.06] p-3 text-xs leading-5 text-amber-100/70 ring-1 ring-amber-400/15">An authorized Telegram session is required for live deletion. Continue in Connection settings first.</div>
+        <label class="flex cursor-pointer items-start gap-3 rounded-xl bg-rose-400/[.045] p-3 ring-1 ring-rose-400/15"><input x-model="confirmDeleteAcknowledge" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-rose-500 focus:ring-rose-400"><span class="text-xs leading-5 text-rose-100/75">I understand that these Telegram messages will be deleted after the backup is created and verified.</span></label>
+        <label class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">Type <code class="font-mono text-rose-300" x-text="'DELETE ' + selectedCandidateIds.length"></code> to continue</span><input x-model="deleteConfirmationText" type="text" autocomplete="off" :placeholder="'DELETE ' + selectedCandidateIds.length" class="h-11 w-full rounded-xl bg-black/20 px-3 font-mono text-sm text-slate-100 ring-1 ring-white/[.08] placeholder:text-slate-700 focus:ring-rose-400/50"></label>
+      </div>
+
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button @click="showDeleteModal=false; confirmDeleteAcknowledge=false; deleteConfirmationText=''" class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-400 hover:bg-white/[.04] hover:text-slate-200">Cancel</button>
+        <button x-show="dryRunMode" @click="executeBatchDelete()" :disabled="deleting" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50" x-text="deleting ? 'Simulating…' : 'Create backup & simulate'"></button>
+        <button x-show="!dryRunMode" @click="executeBatchDelete()" :disabled="deleting || (!telegramAuth && !isOfflineMode) || !confirmDeleteAcknowledge || deleteConfirmationText.trim() !== ('DELETE ' + selectedCandidateIds.length)" class="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-35" x-text="deleting ? 'Deleting…' : 'Create backup & delete live'"></button>
+      </div>
+    </section>
   </div>
 
-  <!-- MODAL: RAW JSON INSPECTOR -->
-  <div 
-    x-show="showRawInspectorModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showRawInspectorModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-2xl w-full p-5 space-y-3 shadow-2xl max-h-[85vh] flex flex-col"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
-        <h3 class="text-xs font-bold text-white font-mono" x-text="`Message #${inspectedMessage?.id} Payload Inspector`"></h3>
-        <button @click="showRawInspectorModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
-      </div>
-      <div class="flex-1 overflow-y-auto bg-canvas p-3 rounded border border-borderSubtle">
-        <pre class="text-[11px] font-mono text-sky-300 whitespace-pre-wrap" x-text="JSON.stringify(inspectedMessage, null, 2)"></pre>
-      </div>
-      <div class="flex justify-end pt-2 border-t border-borderSubtle">
-        <button 
-          @click="copyToClipboard(JSON.stringify(inspectedMessage, null, 2), 'Message JSON')" 
-          class="px-3 py-1 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer"
-        >
-          Copy JSON
-        </button>
-      </div>
-    </div>
+  <!-- Message data -->
+  <div x-show="showRawInspectorModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showRawInspectorModal=false" class="w-full max-w-2xl rounded-2xl bg-[#0f182a] p-5 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true">
+      <div class="flex items-center justify-between"><div><p class="text-xs font-semibold uppercase tracking-[.14em] text-slate-600">Message data</p><h2 class="mt-1 text-base font-semibold text-white" x-text="inspectedMessage ? 'Message #' + inspectedMessage.id : 'Message' "></h2></div><button @click="showRawInspectorModal=false" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white">×</button></div>
+      <pre class="mt-4 max-h-[65dvh] overflow-auto rounded-xl bg-black/25 p-4 font-mono text-[11px] leading-5 text-slate-300 ring-1 ring-white/[.05]" x-text="inspectedMessage ? JSON.stringify(inspectedMessage, null, 2) : ''"></pre>
+    </section>
   </div>
 
-  <!-- MODAL: MEDIA PREVIEW -->
-  <div 
-    x-show="showMediaModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showMediaModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-lg w-full p-5 space-y-3 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
-        <h3 class="text-xs font-bold text-white truncate max-w-xs" x-text="inspectMediaTitle"></h3>
-        <button @click="showMediaModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
+  <!-- Media preview -->
+  <div x-show="showMediaModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showMediaModal=false" class="w-full max-w-3xl rounded-2xl bg-[#0f182a] p-5 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true">
+      <div class="flex items-center justify-between"><h2 class="text-sm font-semibold text-white" x-text="inspectMediaTitle"></h2><button @click="showMediaModal=false" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white">×</button></div>
+      <div class="mt-4 flex min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-black/25 ring-1 ring-white/[.05]">
+        <img x-show="inspectMediaUrl" :src="inspectMediaUrl" :alt="inspectMediaTitle" class="max-h-[70dvh] max-w-full object-contain">
+        <div x-show="!inspectMediaUrl" class="max-w-sm p-8 text-center"><svg class="mx-auto h-8 w-8 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 5h16v14H4zM7 15l3-3 3 3 2-2 3 3M9 9h.01"/></svg><p class="mt-3 text-xs leading-5 text-slate-600">No preview is available for this item. Paths from imported archives are not opened as local files.</p></div>
       </div>
-      <div class="bg-canvas rounded border border-borderSubtle flex items-center justify-center min-h-[220px] p-2">
-        <img :src="inspectMediaUrl" alt="Media payload preview" class="max-h-[360px] max-w-full rounded object-contain" onerror="this.src=''; this.alt='Preview unavailable in current mode';">
-      </div>
-      <div class="text-right">
-        <button @click="showMediaModal = false" class="px-3 py-1 text-xs rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer">Close</button>
-      </div>
-    </div>
+    </section>
   </div>
 
-  <!-- MODAL: IMPORT DESKTOP EXPORT -->
-  <div 
-    x-show="showImportModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showImportModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
-        <h3 class="text-sm font-bold text-white">Import Telegram Desktop JSON</h3>
-        <button @click="showImportModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
-      </div>
-      <div class="space-y-3 text-xs text-slate-300">
-        <p>Select your exported <code class="text-sky-300 font-mono">result.json</code> file generated by Telegram Desktop (Settings &gt; Advanced &gt; Export Telegram data).</p>
-        <div class="border-2 border-dashed border-borderStrong hover:border-sky-500 rounded-lg p-6 text-center cursor-pointer transition">
-          <input type="file" accept=".json" @change="handleFileUpload($event)" class="w-full text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-sky-600 file:text-white hover:file:bg-sky-500 cursor-pointer">
-        </div>
-      </div>
-    </div>
+  <!-- Import -->
+  <div x-show="showImportModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showImportModal=false" class="w-full max-w-md rounded-2xl bg-[#0f182a] p-6 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true" aria-labelledby="import-title">
+      <div class="flex items-start justify-between"><div><p class="text-xs font-semibold uppercase tracking-[.14em] text-slate-600">New source</p><h2 id="import-title" class="mt-1 text-xl font-semibold text-white">Import Telegram archive</h2></div><button @click="showImportModal=false" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white">×</button></div>
+      <p class="mt-3 text-sm leading-6 text-slate-400">Choose the <code class="font-mono text-slate-300">result.json</code> file from a Telegram Desktop export. Importing does not modify Telegram.</p>
+      <label class="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-600/70 bg-black/10 px-5 py-10 text-center hover:border-blue-400/50 hover:bg-blue-400/[.03]">
+        <svg class="h-7 w-7 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 16V4m0 0 4 4m-4-4L8 8M5 16v3h14v-3"/></svg>
+        <span class="mt-3 text-sm font-medium text-slate-300" x-text="uploading ? 'Importing…' : 'Choose JSON file'"></span><span class="mt-1 text-xs text-slate-600">JSON only</span>
+        <input type="file" accept="application/json,.json" class="sr-only" @change="handleFileUpload($event)" :disabled="uploading">
+      </label>
+    </section>
   </div>
 
-  <!-- MODAL: CLOUD OFFSITE EXPORT -->
-  <div 
-    x-show="showCloudExportModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showCloudExportModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-md w-full p-5 space-y-4 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-3">
-        <h3 class="text-sm font-bold text-white">Export Backup Offsite</h3>
-        <button @click="showCloudExportModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
+  <!-- Cloud export -->
+  <div x-show="showCloudExportModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showCloudExportModal=false" class="w-full max-w-md rounded-2xl bg-[#0f182a] p-6 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true">
+      <div class="flex items-start justify-between"><div><p class="text-xs font-semibold uppercase tracking-[.14em] text-slate-600">Cloud backup</p><h2 class="mt-1 text-xl font-semibold text-white">Upload backup</h2></div><button @click="showCloudExportModal=false" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white">×</button></div>
+      <p class="mt-3 truncate text-xs text-slate-500" x-text="exportTargetBackup?.filename || ''"></p>
+      <div class="mt-5 space-y-3">
+        <label class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">Provider</span><select x-model="cloudProvider" class="h-10 w-full rounded-xl bg-black/15 px-3 text-sm text-slate-300 ring-1 ring-white/[.07]"><option value="github">GitHub</option><option value="google_drive">Google Drive</option></select></label>
+        <label class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">Access token</span><input x-model="cloudToken" type="password" autocomplete="off" placeholder="Provider token" class="h-10 w-full rounded-xl bg-black/15 px-3 text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"></label>
+        <label x-show="cloudProvider==='github'" class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">Repository</span><input x-model="cloudRepo" type="text" placeholder="owner/repository" class="h-10 w-full rounded-xl bg-black/15 px-3 text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"></label>
+        <label x-show="cloudProvider==='google_drive'" class="block"><span class="mb-1.5 block text-xs font-medium text-slate-400">Folder ID <span class="text-slate-600">optional</span></span><input x-model="cloudFolderId" type="text" placeholder="Drive folder ID" class="h-10 w-full rounded-xl bg-black/15 px-3 text-sm text-slate-200 ring-1 ring-white/[.07] placeholder:text-slate-700"></label>
       </div>
-
-      <div class="space-y-3 text-xs text-slate-300">
-        <div>
-          <label class="block text-[11px] font-mono text-slate-400 mb-1">Destination Provider</label>
-          <select x-model="cloudProvider" class="w-full bg-canvas border border-borderSubtle rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500">
-            <option value="github">GitHub Repository Storage</option>
-            <option value="google_drive">Google Drive Resumable Storage</option>
-          </select>
-        </div>
-
-        <div x-show="cloudProvider === 'github'">
-          <label class="block text-[11px] font-mono text-slate-400 mb-1">Target Repository (owner/repo)</label>
-          <input type="text" x-model="cloudRepo" placeholder="username/telegram-backups" class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500">
-        </div>
-
-        <div>
-          <label class="block text-[11px] font-mono text-slate-400 mb-1">Access Token</label>
-          <input type="password" x-model="cloudToken" placeholder="GitHub Personal Access Token or Google OAuth Token" class="w-full bg-canvas border border-borderSubtle rounded px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-sky-500">
-        </div>
-      </div>
-
-      <div class="flex justify-end space-x-2 pt-2 border-t border-borderSubtle">
-        <button @click="showCloudExportModal = false" class="px-3 py-1.5 text-xs font-medium rounded bg-surfaceElevated border border-borderSubtle text-slate-300 hover:text-white cursor-pointer">Cancel</button>
-        <button 
-          @click="executeCloudExport()" 
-          :disabled="cloudExporting"
-          class="px-4 py-1.5 text-xs font-semibold rounded bg-sky-600 hover:bg-sky-500 text-white transition active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-        >
-          <span x-text="cloudExporting ? 'Exporting Archive...' : 'Start Offsite Export'"></span>
-        </button>
-      </div>
-    </div>
+      <div class="mt-6 flex justify-end gap-2"><button @click="showCloudExportModal=false" class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-white/[.04] hover:text-slate-300">Cancel</button><button @click="executeCloudExport()" :disabled="cloudExporting || !cloudToken" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-40" x-text="cloudExporting ? 'Exporting…' : 'Export backup'"></button></div>
+    </section>
   </div>
 
-  <!-- MODAL: COMMAND PALETTE (Ctrl+K) -->
-  <div 
-    x-show="showCommandPalette" 
-    class="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showCommandPalette = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-lg w-full overflow-hidden shadow-2xl space-y-2 p-3"
-    >
-      <div class="relative">
-        <input 
-          id="commandPaletteInput"
-          type="text" 
-          x-model="commandQuery" 
-          placeholder="Type a command or filter name..." 
-          class="w-full bg-canvas border border-borderSubtle rounded-md px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono"
-        >
+  <!-- Command palette -->
+  <div x-show="showCommandPalette" class="fixed inset-0 z-[75] flex items-start justify-center bg-black/70 p-4 pt-[12vh] backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showCommandPalette=false" class="w-full max-w-xl overflow-hidden rounded-2xl bg-[#0f182a] shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true">
+      <div class="relative border-b border-white/[.06]"><svg class="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><input id="commandPaletteInput" x-model="commandQuery" @keydown.escape="showCommandPalette=false" type="text" placeholder="Search commands…" class="h-14 w-full bg-transparent pl-11 pr-4 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none"></div>
+      <div class="max-h-[55dvh] overflow-y-auto p-2">
+        <template x-for="cmd in filteredCommands()" :key="cmd.id"><button @click="executeCommand(cmd)" class="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-white/[.05]"><span class="text-sm text-slate-300" x-text="cmd.title"></span><span class="text-[10px] uppercase tracking-wide text-slate-600" x-text="cmd.category"></span></button></template>
+        <div x-show="filteredCommands().length===0" class="px-4 py-8 text-center text-xs text-slate-600">No matching commands</div>
       </div>
-
-      <div class="max-h-64 overflow-y-auto space-y-1 pr-1">
-        <template x-for="cmd in filteredCommands()" :key="cmd.id">
-          <div 
-            @click="executeCommand(cmd)" 
-            class="px-3 py-2 rounded-md hover:bg-surfaceElevated cursor-pointer transition flex items-center justify-between text-xs"
-          >
-            <span class="text-slate-200" x-text="cmd.title"></span>
-            <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-canvas border border-borderSubtle text-slate-400" x-text="cmd.category"></span>
-          </div>
-        </template>
-      </div>
-    </div>
+    </section>
   </div>
 
-  <!-- MODAL: KEYBOARD SHORTCUTS (?) -->
-  <div 
-    x-show="showShortcutsModal" 
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs" 
-    x-cloak
-  >
-    <div 
-      @click.outside="showShortcutsModal = false" 
-      class="bg-surface border border-borderStrong rounded-xl max-w-sm w-full p-5 space-y-4 shadow-2xl"
-    >
-      <div class="flex items-center justify-between border-b border-borderSubtle pb-2.5">
-        <h3 class="text-sm font-bold text-white">Keyboard Navigation</h3>
-        <button @click="showShortcutsModal = false" class="text-slate-500 hover:text-white cursor-pointer">&times;</button>
-      </div>
-      <div class="space-y-2 text-xs text-slate-300 font-mono">
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
-          <span>Command Palette</span>
-          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">Ctrl+K</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
-          <span>Focus Search</span>
-          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">/</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1 border-b border-borderSubtle">
-          <span>Shortcuts Dialog</span>
-          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">?</kbd>
-        </div>
-        <div class="flex justify-between items-center py-1">
-          <span>Dismiss Dialogs</span>
-          <kbd class="px-2 py-0.5 rounded bg-canvas border border-borderSubtle">ESC</kbd>
-        </div>
-      </div>
-    </div>
+  <!-- Shortcuts -->
+  <div x-show="showShortcutsModal" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" x-transition.opacity>
+    <section @click.outside="showShortcutsModal=false" class="w-full max-w-sm rounded-2xl bg-[#0f182a] p-5 shadow-[0_35px_120px_rgba(0,0,0,.55)] ring-1 ring-white/[.10]" role="dialog" aria-modal="true">
+      <div class="flex items-center justify-between"><h2 class="text-base font-semibold text-white">Keyboard shortcuts</h2><button @click="showShortcutsModal=false" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-white/[.05] hover:text-white">×</button></div>
+      <dl class="mt-4 space-y-3 text-xs"><div class="flex justify-between"><dt class="text-slate-400">Command palette</dt><dd><kbd class="rounded bg-white/[.05] px-2 py-1 font-mono text-slate-300">Ctrl K</kbd></dd></div><div class="flex justify-between"><dt class="text-slate-400">Focus review search</dt><dd><kbd class="rounded bg-white/[.05] px-2 py-1 font-mono text-slate-300">/</kbd></dd></div><div class="flex justify-between"><dt class="text-slate-400">Close dialog</dt><dd><kbd class="rounded bg-white/[.05] px-2 py-1 font-mono text-slate-300">Esc</kbd></dd></div><div class="flex justify-between"><dt class="text-slate-400">Show shortcuts</dt><dd><kbd class="rounded bg-white/[.05] px-2 py-1 font-mono text-slate-300">?</kbd></dd></div></dl>
+    </section>
   </div>
 
-  <!-- TOAST NOTIFICATIONS STACK -->
-  <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full pointer-events-none">
-    <template x-for="t in toasts" :key="t.id">
-      <div 
-        class="pointer-events-auto p-3 rounded-lg border shadow-xl flex items-start justify-between space-x-2 text-xs transition-all"
-        :class="{
-          'bg-slate-900 border-sky-600 text-sky-200': t.type === 'info',
-          'bg-slate-900 border-emerald-600 text-emerald-200': t.type === 'success',
-          'bg-slate-900 border-amber-600 text-amber-200': t.type === 'warning',
-          'bg-slate-900 border-rose-600 text-rose-200': t.type === 'error'
-        }"
-      >
-        <span class="flex-1 break-words" x-text="t.message"></span>
-        <button @click="removeToast(t.id)" class="text-slate-400 hover:text-white cursor-pointer">&times;</button>
+  <!-- Toasts -->
+  <div class="pointer-events-none fixed bottom-4 right-4 z-[90] flex w-[min(92vw,380px)] flex-col gap-2" aria-live="polite">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div class="pointer-events-auto rounded-xl px-4 py-3 text-sm shadow-2xl ring-1 backdrop-blur-xl" :class="{
+        'bg-emerald-950/90 text-emerald-100 ring-emerald-400/20': toast.type==='success',
+        'bg-rose-950/90 text-rose-100 ring-rose-400/20': toast.type==='error',
+        'bg-amber-950/90 text-amber-100 ring-amber-400/20': toast.type==='warning',
+        'bg-slate-900/95 text-slate-200 ring-white/10': toast.type==='info'
+      }">
+        <div class="flex gap-3"><p class="min-w-0 flex-1 text-xs leading-5" x-text="toast.message"></p><button @click="removeToast(toast.id)" class="shrink-0 text-current opacity-50 hover:opacity-100" aria-label="Dismiss notification">×</button></div>
       </div>
     </template>
   </div>
 
+  <!-- discreet shortcut affordance -->
+  <button @click="showShortcutsModal=true" class="fixed bottom-4 left-4 z-20 hidden h-8 w-8 items-center justify-center rounded-full bg-white/[.035] font-mono text-xs text-slate-600 ring-1 ring-white/[.05] hover:text-slate-300 md:flex" title="Keyboard shortcuts">?</button>
 </body>
 </html>
