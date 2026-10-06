@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -285,3 +286,44 @@ def test_api_token_protects_mutating_and_read_api(
     )
     assert authorized.status_code == 200
     assert protected_client.get("/").status_code == 200
+
+
+def test_trusted_host_middleware_rejects_untrusted_host(
+    web_db: DatabaseManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Loopback-only host protection blocks DNS rebinding when API token is unset."""
+    from tg_cleaner.core.settings import settings
+
+    monkeypatch.setattr(settings, "api_token", "")
+    app = create_app(db=web_db, backup_dir=str(tmp_path / "backups"))
+    client = TestClient(app)
+
+    # Valid loopback host
+    resp_ok = client.get("/api/health", headers={"host": "localhost"})
+    assert resp_ok.status_code == 200
+
+    # Untrusted external host header (e.g. DNS rebinding)
+    resp_bad = client.get("/api/health", headers={"host": "evil.example.com"})
+    assert resp_bad.status_code == 400
+    assert "Invalid host header" in resp_bad.text
+
+
+@pytest.mark.asyncio
+async def test_auth_endpoints_discard_active_client(web_db: DatabaseManager, tmp_path: Path):
+    """Calling auth endpoints properly disconnects and discards active in-process client."""
+    mock_client = AsyncMock()
+    app = create_app(db=web_db, client=mock_client, backup_dir=str(tmp_path / "backups"))
+    client = TestClient(app)
+
+    # Calling save credentials should disconnect and discard active client
+    resp = client.post(
+        "/api/auth/credentials",
+        json={
+            "api_id": 12345,
+            "api_hash": "0123456789abcdef0123456789abcdef",
+            "phone": "+1234567890",
+        },
+    )
+    assert resp.status_code == 200
+    assert app.state.client is None
+    assert mock_client.disconnect.call_count == 1

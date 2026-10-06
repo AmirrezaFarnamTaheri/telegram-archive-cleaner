@@ -6,6 +6,7 @@ Verifies pre-deletion JSON snapshots, SHA-256 verification,
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -237,3 +238,29 @@ def test_cloud_verifier_matches_backup_checksum_for_unicode(
 
     assert valid is True
     assert digest == payload["sha256"]
+
+
+def test_backup_verifier_legacy_ascii_checksum_fallback(tmp_path: Path):
+    """Verify that legacy v1.0 / versionless backups with ASCII-escaped hashes pass verification."""
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    manager = BackupManager(backup_dir=str(backup_dir))
+
+    messages_payload = [{"id": 1, "text": "سلام دنیا"}]
+    # Legacy ASCII-escaped checksum
+    legacy_bytes = json.dumps(messages_payload, sort_keys=True).encode("utf-8")
+    legacy_sha = hashlib.sha256(legacy_bytes).hexdigest()
+
+    backup_file = backup_dir / "chat_1_legacy.json"
+    snapshot_data = {
+        "version": "1.0",
+        "chat_id": 1,
+        "message_count": 1,
+        "requested_message_ids": [1],
+        "sha256": legacy_sha,
+        "messages": messages_payload,
+    }
+    with open(backup_file, "w", encoding="utf-8") as f:
+        json.dump(snapshot_data, f, indent=2, ensure_ascii=False)
+
+    assert manager.verify_backup(backup_file) is True

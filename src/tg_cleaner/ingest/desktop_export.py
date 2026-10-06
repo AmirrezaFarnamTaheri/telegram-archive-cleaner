@@ -99,6 +99,8 @@ def import_desktop_export_from_dict(
 
         raw_text, urls = _extract_plain_text_and_urls(item.get("text", ""))
         file_ref = item.get("file")
+        if isinstance(file_ref, str) and file_ref.strip().startswith("("):
+            file_ref = None
         media_type = item.get("media_type")
         if not media_type and file_ref:
             media_type = "document"

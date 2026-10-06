@@ -1,9 +1,10 @@
 """Duplicate detection with conservative deletion eligibility.
 
 The analyzer deliberately separates *finding similarity* from *authorizing deletion*.
-Only deterministic equivalence classes (identical normalized text, or the same Telegram
-media object with the same caption) are auto-eligible. Fuzzy, perceptual, forwarded,
-and same-media/different-caption findings require an explicit user preset/action.
+Deterministic equivalence classes (identical normalized text, the same Telegram
+media object with identical caption, or the same media object with modified captions
+evaluated under an active retention preset) are auto-eligible. Fuzzy text, perceptual image
+matches, and forward chains require explicit user review.
 """
 
 from __future__ import annotations

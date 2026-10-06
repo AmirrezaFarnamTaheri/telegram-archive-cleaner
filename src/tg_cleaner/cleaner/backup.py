@@ -150,7 +150,12 @@ class BackupManager:
                     return False
 
             computed_sha = self._payload_checksum(messages)
-            return computed_sha == recorded_sha
+            if computed_sha == recorded_sha:
+                return True
+            if data.get("version") in (None, "1.0"):
+                legacy_bytes = json.dumps(messages, sort_keys=True).encode("utf-8")
+                return hashlib.sha256(legacy_bytes).hexdigest() == recorded_sha
+            return False
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             return False
 

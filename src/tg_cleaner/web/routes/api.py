@@ -669,13 +669,8 @@ async def get_auth_status(request: Request) -> dict[str, Any]:
         }
 
 
-@router.post("/auth/credentials")
-async def save_auth_credentials(
-    payload: AuthCredentialsRequest, request: Request
-) -> dict[str, Any]:
-    """Persist Telegram API/proxy configuration and invalidate the active client."""
-    from tg_cleaner.core.settings import update_credentials_and_save
-
+async def _discard_app_client(request: Request) -> None:
+    """Safely disconnect and discard any active TelegramClient on app state."""
     active = getattr(request.app.state, "client", None)
     if active is not None:
         disconnect = getattr(active, "disconnect", None)
@@ -687,6 +682,16 @@ async def save_auth_credentials(
             except Exception:
                 pass
         request.app.state.client = None
+
+
+@router.post("/auth/credentials")
+async def save_auth_credentials(
+    payload: AuthCredentialsRequest, request: Request
+) -> dict[str, Any]:
+    """Persist Telegram API/proxy configuration and invalidate the active client."""
+    from tg_cleaner.core.settings import update_credentials_and_save
+
+    await _discard_app_client(request)
 
     update_credentials_and_save(
         api_id=payload.api_id,
@@ -708,6 +713,8 @@ async def auth_send_code(payload: AuthSendCodeRequest, request: Request) -> dict
     from tg_cleaner.core.auth import TelegramAuthManager
     from tg_cleaner.core.settings import settings, update_credentials_and_save
 
+    await _discard_app_client(request)
+
     update_credentials_and_save(
         api_id=payload.api_id,
         api_hash=payload.api_hash,
@@ -719,8 +726,6 @@ async def auth_send_code(payload: AuthSendCodeRequest, request: Request) -> dict
         proxy_password=payload.proxy_password,
         proxy_secret=payload.proxy_secret,
     )
-
-    request.app.state.client = None
 
     if not settings.telegram_api_id or not settings.telegram_api_hash:
         raise HTTPException(
@@ -785,7 +790,7 @@ async def auth_logout(request: Request) -> dict[str, Any]:
             if await auth.is_authorized():
                 await auth.logout()
     finally:
-        request.app.state.client = None
+        await _discard_app_client(request)
     return {"status": "ok"}
 
 

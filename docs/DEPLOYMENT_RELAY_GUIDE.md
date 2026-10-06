@@ -30,6 +30,7 @@ Install and authenticate `cloudflared`, then create a tunnel:
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create tg-cleaner
+cloudflared tunnel route dns tg-cleaner cleaner.example.com
 ```
 
 Example configuration:

@@ -162,3 +162,68 @@ def test_mark_messages_deleted(db):
     db.mark_messages_deleted(999, [55])
     updated = db.get_message(999, 55)
     assert updated.is_deleted_locally is True
+
+
+def test_adapt_datetime_tz_aware(db):
+    """Verify that timezone-aware datetimes are stored as naive UTC in SQLite."""
+    from datetime import timedelta, timezone
+
+    tz = timezone(timedelta(hours=3, minutes=30))
+    dt_aware = datetime(2026, 4, 1, 15, 30, 0, tzinfo=tz)
+    chat = ChatRecord(id=888, title="TZ Chat", last_scanned=dt_aware)
+    db.upsert_chat(chat)
+
+    retrieved = db.get_chat(888)
+    assert retrieved is not None
+    # Converted to naive UTC: 15:30 +03:30 -> 12:00 UTC
+    assert retrieved.last_scanned == datetime(2026, 4, 1, 12, 0, 0)
+    assert retrieved.last_scanned.tzinfo is None
+
+
+def test_review_overrides_persist_across_rescans(db):
+    """Verify manual deletion approvals/revocations persist across rescan cycles."""
+    chat = ChatRecord(id=500, title="Override Test")
+    db.upsert_chat(chat)
+    msg = MessageRecord(
+        id=1, chat_id=500, date=datetime(2026, 1, 1), text="Msg 1", raw_text="Msg 1"
+    )
+    db.upsert_messages([msg])
+
+    # Initial finding: eligible for deletion
+    flag = AnalysisFlag(
+        message_id=1,
+        chat_id=500,
+        flag_type=FlagType.DUPLICATE_EXACT_TEXT,
+        is_candidate_for_deletion=True,
+    )
+    db.upsert_flags([flag])
+    assert len(db.get_deletion_candidates(500)) == 1
+
+    # User manually revokes eligibility
+    count = db.set_message_deletion_eligibility(500, 1, False)
+    assert count == 1
+    assert len(db.get_deletion_candidates(500)) == 0
+    assert db.get_review_overrides(500) == {1: False}
+
+    # Rescan clears flags
+    db.clear_flags_for_chat(500)
+    assert len(db.get_flags_for_chat(500)) == 0
+
+    # Rescan analyzer inserts fresh flag with is_candidate_for_deletion=True
+    fresh_flag = AnalysisFlag(
+        message_id=1,
+        chat_id=500,
+        flag_type=FlagType.DUPLICATE_EXACT_TEXT,
+        is_candidate_for_deletion=True,
+    )
+    db.upsert_flags([fresh_flag])
+
+    # Review override must have suppressed the fresh candidate status
+    flags = db.get_flags_for_chat(500)
+    assert len(flags) == 1
+    assert flags[0].is_candidate_for_deletion is False
+    assert len(db.get_deletion_candidates(500)) == 0
+
+    # Deleting message cleans up override
+    db.mark_messages_deleted(500, [1])
+    assert db.get_review_overrides(500) == {}

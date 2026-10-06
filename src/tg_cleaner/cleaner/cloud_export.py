@@ -50,6 +50,12 @@ class CloudExportManager:
         actual_hash = hashlib.sha256(
             json.dumps(messages, sort_keys=True, ensure_ascii=False).encode("utf-8")
         ).hexdigest()
+        if actual_hash != expected_hash and data.get("version") in (None, "1.0"):
+            legacy_hash = hashlib.sha256(
+                json.dumps(messages, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+            if legacy_hash == expected_hash:
+                actual_hash = legacy_hash
 
         is_valid = actual_hash == expected_hash
         return is_valid, actual_hash, data

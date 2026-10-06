@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -67,6 +68,13 @@ def create_app(
     # Also initialize synchronously so programmatic callers that do not run ASGI lifespan
     # still receive a usable application (e.g. lightweight tests and embedded launchers).
     db_manager.init_db()
+
+    if not settings.api_token:
+        allowed = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+        if settings.web_host and settings.web_host not in ("0.0.0.0", ""):
+            allowed.append(settings.web_host)
+        allowed_hosts = list(dict.fromkeys(allowed))
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
     @app.middleware("http")
     async def security_boundary(request: Request, call_next: Any) -> Any:

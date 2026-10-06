@@ -23,6 +23,8 @@ from tg_cleaner.core.models import (
 
 def _adapt_datetime(value: datetime) -> str:
     """Serialize datetimes explicitly instead of relying on sqlite3 defaults."""
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC).replace(tzinfo=None)
     return value.isoformat(sep=" ")
 
 
@@ -170,6 +172,15 @@ class DatabaseManager:
                     sha256_checksum TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS review_overrides (
+                    chat_id INTEGER NOT NULL,
+                    message_id INTEGER NOT NULL,
+                    is_candidate_for_deletion BOOLEAN NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (chat_id, message_id),
+                    FOREIGN KEY (chat_id, message_id) REFERENCES messages(chat_id, id) ON DELETE CASCADE
+                );
+
                 CREATE TABLE IF NOT EXISTS deletion_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     chat_id INTEGER NOT NULL,
@@ -185,7 +196,14 @@ class DatabaseManager:
         """Check that SQLite can read the schema and passes a lightweight integrity check."""
         try:
             with self.get_connection() as conn:
-                required = {"chats", "messages", "analysis_flags", "duplicate_groups", "backups"}
+                required = {
+                    "chats",
+                    "messages",
+                    "analysis_flags",
+                    "duplicate_groups",
+                    "backups",
+                    "review_overrides",
+                }
                 rows = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table';"
                 ).fetchall()
@@ -479,12 +497,26 @@ class DatabaseManager:
                 message_id, chat_id, flag_type, group_id,
                 is_candidate_for_deletion, confidence, details
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT DO UPDATE SET
+            ON CONFLICT(chat_id, message_id, flag_type, IFNULL(group_id, '')) DO UPDATE SET
                 is_candidate_for_deletion = excluded.is_candidate_for_deletion,
                 confidence = excluded.confidence,
                 details = excluded.details;
             """,
             self._flag_rows(flags),
+        )
+        conn.execute(
+            """
+            UPDATE analysis_flags
+            SET is_candidate_for_deletion = (
+                SELECT o.is_candidate_for_deletion
+                FROM review_overrides o
+                WHERE o.chat_id = analysis_flags.chat_id AND o.message_id = analysis_flags.message_id
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM review_overrides o
+                WHERE o.chat_id = analysis_flags.chat_id AND o.message_id = analysis_flags.message_id
+            );
+            """
         )
 
     def upsert_flags(self, flags: list[AnalysisFlag]) -> None:
@@ -551,7 +583,28 @@ class DatabaseManager:
                 """,
                 (1 if eligible else 0, chat_id, message_id),
             )
-            return cursor.rowcount
+            count = cursor.rowcount
+            if count > 0:
+                conn.execute(
+                    """
+                    INSERT INTO review_overrides (chat_id, message_id, is_candidate_for_deletion, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(chat_id, message_id) DO UPDATE SET
+                        is_candidate_for_deletion = excluded.is_candidate_for_deletion,
+                        updated_at = excluded.updated_at;
+                    """,
+                    (chat_id, message_id, 1 if eligible else 0, _utc_now_naive()),
+                )
+            return count
+
+    def get_review_overrides(self, chat_id: int) -> dict[int, bool]:
+        """Fetch manual review overrides for a chat as a mapping of message_id -> is_candidate."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT message_id, is_candidate_for_deletion FROM review_overrides WHERE chat_id = ?;",
+                (chat_id,),
+            ).fetchall()
+            return {r["message_id"]: bool(r["is_candidate_for_deletion"]) for r in rows}
 
     def get_deletion_candidates(self, chat_id: int) -> list[MessageRecord]:
         """Get all messages flagged as candidates for deletion."""
@@ -560,7 +613,10 @@ class DatabaseManager:
                 """
                 SELECT DISTINCT m.* FROM messages m
                 JOIN analysis_flags f ON m.chat_id = f.chat_id AND m.id = f.message_id
-                WHERE m.chat_id = ? AND f.is_candidate_for_deletion = 1 AND m.is_deleted_locally = 0
+                LEFT JOIN review_overrides o ON m.chat_id = o.chat_id AND m.id = o.message_id
+                WHERE m.chat_id = ?
+                  AND COALESCE(o.is_candidate_for_deletion, f.is_candidate_for_deletion) = 1
+                  AND m.is_deleted_locally = 0
                 ORDER BY m.date ASC;
                 """,
                 (chat_id,),
@@ -575,6 +631,10 @@ class DatabaseManager:
         with self.get_connection() as conn:
             conn.execute(
                 f"UPDATE messages SET is_deleted_locally = 1 WHERE chat_id = ? AND id IN ({placeholders});",
+                [chat_id, *message_ids],
+            )
+            conn.execute(
+                f"DELETE FROM review_overrides WHERE chat_id = ? AND message_id IN ({placeholders});",
                 [chat_id, *message_ids],
             )
 

@@ -15,7 +15,7 @@ from tg_cleaner.analyzer.stale import StaleContentAnalyzer
 from tg_cleaner.cleaner.backup import BackupManager
 from tg_cleaner.cleaner.executor import DeletionExecutor
 from tg_cleaner.core.db import DatabaseManager
-from tg_cleaner.core.models import RetentionPreset
+from tg_cleaner.core.models import DuplicateGroupType, RetentionPreset
 from tg_cleaner.core.settings import settings
 from tg_cleaner.ingest.desktop_export import parse_desktop_export_json
 from tg_cleaner.web.app import create_app
@@ -116,10 +116,17 @@ def import_export(
 
     typer.echo(f"Importing Telegram export from {export_path}...")
     result = parse_desktop_export_json(export_path, db)
-    typer.secho(
-        f"[OK] Imported {result['messages_imported']} messages into chat '{result['chat_title']}' (ID: {result['chat_id']})",
-        fg=typer.colors.GREEN,
-    )
+    if result.get("chats_imported", 1) > 1:
+        cids = ", ".join(str(cid) for cid in result.get("chat_ids", []))
+        typer.secho(
+            f"[OK] Imported {result['messages_imported']} messages across {result['chats_imported']} chats (IDs: {cids})",
+            fg=typer.colors.GREEN,
+        )
+    else:
+        typer.secho(
+            f"[OK] Imported {result['messages_imported']} messages into chat '{result.get('chat_title', 'Unknown')}' (ID: {result.get('chat_id')})",
+            fg=typer.colors.GREEN,
+        )
 
 
 @app.command()
@@ -192,10 +199,17 @@ def delete(
         raise typer.Exit(code=2) from exc
 
     # The CLI preset is an execution input, so apply it before calculating the
-    # candidate set rather than silently ignoring it.
+    # candidate set rather than silently ignoring it. Only apply to auto-eligible types
+    # so ambiguous/review-only groups are not deleted without manual inspection.
     dedupe_engine = DeduplicationEngine(db)
+    auto_eligible_types = {
+        DuplicateGroupType.EXACT_TEXT,
+        DuplicateGroupType.EXACT_MEDIA,
+        DuplicateGroupType.SAME_MEDIA_DIFF_CAPTION,
+    }
     for group in db.get_duplicate_groups(chat_id):
-        dedupe_engine.apply_retention_preset(group, selected_preset)
+        if group.group_type in auto_eligible_types:
+            dedupe_engine.apply_retention_preset(group, selected_preset)
 
     candidates = db.get_deletion_candidates(chat_id)
     if not candidates:
