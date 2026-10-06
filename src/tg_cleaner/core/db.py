@@ -185,36 +185,30 @@ class DatabaseManager:
                 ),
             )
 
+    def _row_to_chat(self, row: sqlite3.Row) -> ChatRecord:
+        """Convert a database row to ChatRecord model."""
+        return ChatRecord(
+            id=row["id"],
+            title=row["title"],
+            username=row["username"],
+            chat_type=row["chat_type"],
+            total_messages=row["total_messages"],
+            last_scanned=row["last_scanned"],
+        )
+
     def get_chat(self, chat_id: int) -> ChatRecord | None:
         """Fetch chat record by ID."""
         with self.get_connection() as conn:
             row = conn.execute("SELECT * FROM chats WHERE id = ?;", (chat_id,)).fetchone()
             if not row:
                 return None
-            return ChatRecord(
-                id=row["id"],
-                title=row["title"],
-                username=row["username"],
-                chat_type=row["chat_type"],
-                total_messages=row["total_messages"],
-                last_scanned=row["last_scanned"],
-            )
+            return self._row_to_chat(row)
 
     def list_chats(self) -> list[ChatRecord]:
         """List all audited chats."""
         with self.get_connection() as conn:
             rows = conn.execute("SELECT * FROM chats ORDER BY last_scanned DESC;").fetchall()
-            return [
-                ChatRecord(
-                    id=row["id"],
-                    title=row["title"],
-                    username=row["username"],
-                    chat_type=row["chat_type"],
-                    total_messages=row["total_messages"],
-                    last_scanned=row["last_scanned"],
-                )
-                for row in rows
-            ]
+            return [self._row_to_chat(row) for row in rows]
 
     def upsert_messages(self, messages: list[MessageRecord]) -> None:
         """Batch upsert messages."""
@@ -370,46 +364,35 @@ class DatabaseManager:
                 ),
             )
 
+    def _row_to_duplicate_group(self, row: sqlite3.Row) -> DuplicateGroup:
+        """Convert a database row to DuplicateGroup model."""
+        msg_ids = json.loads(row["message_ids"]) if row["message_ids"] else []
+        diff = json.loads(row["diff_summary"]) if row["diff_summary"] else {}
+        return DuplicateGroup(
+            id=row["id"],
+            chat_id=row["chat_id"],
+            group_type=DuplicateGroupType(row["group_type"]),
+            message_ids=msg_ids,
+            primary_message_id=row["primary_message_id"],
+            recommended_preset=RetentionPreset(row["recommended_preset"]),
+            diff_summary=diff,
+        )
+
     def get_duplicate_groups(self, chat_id: int) -> list[DuplicateGroup]:
         """Retrieve duplicate groups for a chat."""
         with self.get_connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM duplicate_groups WHERE chat_id = ?;", (chat_id,)
             ).fetchall()
-            groups = []
-            for r in rows:
-                msg_ids = json.loads(r["message_ids"]) if r["message_ids"] else []
-                diff = json.loads(r["diff_summary"]) if r["diff_summary"] else {}
-                groups.append(
-                    DuplicateGroup(
-                        id=r["id"],
-                        chat_id=r["chat_id"],
-                        group_type=DuplicateGroupType(r["group_type"]),
-                        message_ids=msg_ids,
-                        primary_message_id=r["primary_message_id"],
-                        recommended_preset=RetentionPreset(r["recommended_preset"]),
-                        diff_summary=diff,
-                    )
-                )
-            return groups
+            return [self._row_to_duplicate_group(r) for r in rows]
 
     def get_duplicate_group(self, group_id: str) -> DuplicateGroup | None:
         """Retrieve a specific duplicate group by its ID."""
         with self.get_connection() as conn:
-            r = conn.execute("SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)).fetchone()
-            if not r:
+            row = conn.execute("SELECT * FROM duplicate_groups WHERE id = ?;", (group_id,)).fetchone()
+            if not row:
                 return None
-            msg_ids = json.loads(r["message_ids"]) if r["message_ids"] else []
-            diff = json.loads(r["diff_summary"]) if r["diff_summary"] else {}
-            return DuplicateGroup(
-                id=r["id"],
-                chat_id=r["chat_id"],
-                group_type=DuplicateGroupType(r["group_type"]),
-                message_ids=msg_ids,
-                primary_message_id=r["primary_message_id"],
-                recommended_preset=RetentionPreset(r["recommended_preset"]),
-                diff_summary=diff,
-            )
+            return self._row_to_duplicate_group(row)
 
     def upsert_flags(self, flags: list[AnalysisFlag]) -> None:
         """Batch insert analysis flags."""
@@ -449,28 +432,27 @@ class DatabaseManager:
             conn.execute("DELETE FROM analysis_flags WHERE chat_id = ?;", (chat_id,))
             conn.execute("DELETE FROM duplicate_groups WHERE chat_id = ?;", (chat_id,))
 
+    def _row_to_flag(self, row: sqlite3.Row) -> AnalysisFlag:
+        """Convert a database row to AnalysisFlag model."""
+        details = json.loads(row["details"]) if row["details"] else {}
+        return AnalysisFlag(
+            id=row["id"],
+            message_id=row["message_id"],
+            chat_id=row["chat_id"],
+            flag_type=FlagType(row["flag_type"]),
+            group_id=row["group_id"],
+            is_candidate_for_deletion=bool(row["is_candidate_for_deletion"]),
+            confidence=row["confidence"],
+            details=details,
+        )
+
     def get_flags_for_chat(self, chat_id: int) -> list[AnalysisFlag]:
         """Fetch all audit flags for a chat."""
         with self.get_connection() as conn:
             rows = conn.execute(
                 "SELECT * FROM analysis_flags WHERE chat_id = ?;", (chat_id,)
             ).fetchall()
-            flags = []
-            for r in rows:
-                dt = json.loads(r["details"]) if r["details"] else {}
-                flags.append(
-                    AnalysisFlag(
-                        id=r["id"],
-                        message_id=r["message_id"],
-                        chat_id=r["chat_id"],
-                        flag_type=FlagType(r["flag_type"]),
-                        group_id=r["group_id"],
-                        is_candidate_for_deletion=bool(r["is_candidate_for_deletion"]),
-                        confidence=r["confidence"],
-                        details=dt,
-                    )
-                )
-            return flags
+            return [self._row_to_flag(r) for r in rows]
 
     def get_deletion_candidates(self, chat_id: int) -> list[MessageRecord]:
         """Get all messages flagged as candidates for deletion."""
