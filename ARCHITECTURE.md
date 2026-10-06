@@ -1,266 +1,136 @@
-# Architecture
+# Architecture: Telegram Archive Cleaner
 
-## 1. Goal and constraints
+## 1. System Overview
 
-Discover, deduplicate, and broadcast full-time **pre-doctoral** research
-assistantships, fellowships, and research positions (economics, finance,
-public policy, quantitative social science) across the UK, Europe, Canada,
-the US, and international institutions, to Telegram and X/Twitter on a
-daily schedule, at **zero recurring dollar cost**.
+Telegram Archive Cleaner (`tg-cleaner`) is an offline-capable, safety-first audit and deletion engine for Telegram archives. It audits Saved Messages, private channels, supergroups, and offline Telegram Desktop export archives (`result.json`).
 
-The zero-cost constraint governs every architectural decision: no paid compute,
-no paid database tier, and zero-dependency fallbacks for every network service.
-The pipeline operates as a scheduled batch job with committed state in version
-control, executing cleanly on standard GitHub Actions runners.
-
-## 2. System overview
+The system identifies exact duplicate messages, same-media messages with differing captions, dead web hyperlinks, expired Telegram invitation links, policy restrictions, and orphaned stubs from deleted accounts. Before any destructive operation occurs, the system mandates a verified local backup archive.
 
 ```
-GitHub Actions (cron, daily)
-        |
-        v
-  +-----------+     +--------------+     +-------------+     +-----------+
-  | Ingestion |---->| Deterministic|---->| Extraction   |---->| Dedup     |
-  | (boards,  |     | gate (rules, |     | (Heuristic/ |     | (URL ->   |
-  |  feeds,   |     |  multi-lang) |     |  Gemini)    |     |  MinHash  |
-  |  portals, |     +--------------+     +-------------+     |  -> fuzzy)|
-  |  X/Tw)    |                                              +-----+-----+
-  +-----------+                                                    |
-        ^                                                          v
-        |                                                   +-------------+
-        |                                                   | SQLite (v5) |
-        |                                                   | (pending -> |
-        |                                                   |  published) |
-        |                                                   +------+------+
-        |                                                          |
-  config/sources.toml                                              v
-        |                                                   +-------------+
-        |                                                   | Broadcast   |
-        +---------------------------------------------------| (Telegram & |
-                                                            |  X/Twitter) |
-                                                            +------+------+
-                                                                   |
-                                                                   v
-                                                      data/listings.ndjson
-                                                     (committed journal) +
-                                                      docs/data/*.json
-                                                      (GitHub Pages)
+                      +---------------------------------------+
+                      |         Archive Ingestion             |
+                      |  - MTProto Client (Telethon)          |
+                      |  - Desktop Export Parser (result.json)|
+                      +-------------------+-------------------+
+                                          |
+                                          v
+                      +---------------------------------------+
+                      |       SQLite WAL Store (cleaner.db)   |
+                      |  - Messages & Raw Payloads            |
+                      |  - Media Metadata & Perceptual Hashes |
+                      |  - Safety Ledger & Candidate Indexes  |
+                      +-------------------+-------------------+
+                                          |
+        +---------------------------------+---------------------------------+
+        |                                 |                                 |
+        v                                 v                                 v
++-----------------------+     +-----------------------+     +-----------------------+
+|  Deduplication Engine |     |  Link & Policy Engine |     |  Safety & Backup Core |
+|  - SHA-256 Content    |     |  - Async HTTP Prober  |     |  - Pre-deletion JSON  |
+|  - Token Sort Fuzzy   |     |  - SSRF Guardrails    |     |  - SHA-256 Integrity  |
+|  - Perceptual dHash   |     |  - Invite Link Verif. |     |  - Paced Deletion     |
+|  - Same-Media Diff    |     |  - Restricted Posts   |     |  - Cloud Export S3    |
++-----------------------+     +-----------------------+     +-----------------------+
+        |                                 |                                 |
+        +---------------------------------+---------------------------------+
+                                          |
+                                          v
+                      +---------------------------------------+
+                      |      Operator Interfaces              |
+                      |  - CLI Interface (Typer)              |
+                      |  - Web Cockpit (FastAPI + Alpine.js)  |
+                      |  - Standalone Executable (PyInstaller)|
+                      +---------------------------------------+
 ```
 
-> [!TIP]
-> An interactive visual architecture diagram with dark and light themes, narrative tours, and pan and zoom controls is available at [`docs/architecture.html`](docs/architecture.html).
+---
 
-One run executes sequentially:
-1. Rebuild SQLite cache from `data/listings.ndjson` and `data/seen.ndjson` if empty.
-2. Ingest postings from enabled job boards, feeds, ATS portals, and X/Twitter.
-3. Gate each item: check seen cache, evaluate deterministic regex rules.
-4. Extract structured metadata: run heuristic extractor (or Gemini if key is provided).
-5. Coerce to strict `PredocListing` domain model and evaluate confidence score.
-6. Deduplicate across three tiers (URL hash, MinHash/LSH, fuzzy composite key).
-7. Insert new listings as `pending` in SQLite.
-8. Broadcast pending listings to Telegram channels and X/Twitter accounts.
-9. Mark listings as `published` (or `undeliverable` on fatal errors).
-10. Check filled/closed status for existing listings and expire past-deadline items.
-11. Prune expired seen/DLQ entries and commit updated NDJSON journals.
-12. Export JSON datasets and RSS feed for GitHub Pages dashboard.
+## 2. Component Architecture
 
-## 3. Tier-by-tier trade-off analysis
+### 2.1 Ingestion Layer
 
-### 3.1 Ingestion
+The ingestion layer normalizes incoming message streams into uniform message schemas.
 
-| Option | Cost | Reliability | ToS risk | Verdict |
-|---|---|---|---|---|
-| Academic Job Boards (`boards/`) | Free | High: specialized scrapers for PREDOC, EconJobMarket, EURAXESS, SOMMA, academics.de, and university portals | Low: respects pacing and fetches public job listings | **Default on.** Core ingestion source. |
-| RSS/Atom feeds | Free | High: standard syndication structures | None: explicit public syndication channel | **Default on.** `ingest/collectors.py::collect_feeds`. |
-| Schema.org `JobPosting` on career pages | Free | Medium: requires ATS structured microdata or JSON-LD | Low: machine-readable search engine markup | **Default on.** `collect_portals` with detail page link following. |
-| Official X API v2 Search (`ingest/x.py`) | Free (Basic tier) | High: official authenticated REST endpoint | None: uses official API credentials | **Default on** when `X_BEARER_TOKEN` is configured. |
-| Xquik Platform API (`ingest/xquik.py`) | Free/Freemium | High: managed scraping proxy endpoint | Low: offloads network proxying | **Default on** when `XQUIK_API_KEY` is configured. |
-| Commercial job boards (LinkedIn, Indeed) via `python-jobspy` | Free (library) | Medium: breaks on markup changes | **High**: restrictive terms of service | **Default off.** Opt-in via `ENABLE_JOBSPY=true`. |
-| Authenticated social scraping via `twscrape` | Free (library) | Low: aggressive rate-limits and account suspensions | **High**: automated browser session simulation | **Default off.** Opt-in via `ENABLE_TWITTER=true`. |
+1. **Desktop Export Parser (`tg_cleaner.ingest.desktop_export`)**:
+   - Parses official Telegram Desktop `result.json` export files.
+   - Extracts message identifiers, ISO 8601 timestamps, sender details, text tokens, reply chains, forwarded origins, and file attachments.
+   - Operates entirely offline without requiring Telegram API keys or network sockets.
 
-Feeds and portals form the ingestion backbone because they carry minimal
-legal and operational risk. Publishers syndicate them for machine
-consumption or embed Schema.org metadata for search engines.
+2. **MTProto Live Synchronizer (`tg_cleaner.ingest.live`)**:
+   - Connects to Telegram core servers via Telethon over MTProto.
+   - Supports user accounts (`Saved Messages`, private groups, channels) and bot tokens.
+   - Implements sequential message retrieval with checkpoint markers to resume interrupted synchronization runs.
 
-### 3.2 Extraction
+### 2.2 Storage Layer
 
-| Option | Cost | Determinism | Maintenance burden |
-|---|---|---|---|
-| Regex/keyword only | Free | High, but brittle: fails on paraphrased titles like "Assistant zur Erforschung von..." versus "Research Assistant" | Low ongoing cost, but lower recall on phrasing variations |
-| LLM (Gemini free tier), loose JSON contract | Free (rate-limited) | Handles paraphrases and multilingual text; probabilistic | Endpoint shapes and rate limits can shift under the free tier. Dual-backend auto-probing mitigates this risk. |
-| LLM (paid tier) | Recurring cost | Same as above, higher rate limits | Violates the zero-cost constraint |
+The storage layer provides ACID guarantees and resilient persistence.
 
-**Design: deterministic gating (`core/gating.py`) precedes LLM extraction.**
-The gate keeps model usage within free quotas. It rejects obvious
-non-targets (PhD studentships, postdocs, faculty postings, paper
-announcements) using regex filters and requires positive hiring-intent signals
-in one of seven supported languages. This limits LLM calls to ambiguous listings
-that require semantic parsing.
+- **Engine (`tg_cleaner.core.db`)**: SQLite with Write-Ahead Logging (WAL) enabled (`PRAGMA journal_mode=WAL`).
+- **Storage Path Fallback**: Defaults to `data/cleaner.db`. If filesystem write permissions are denied in the working directory, the database automatically initializes under `%LOCALAPPDATA%/tg_cleaner/data/cleaner.db` on Windows or `~/.local/share/tg_cleaner/data/cleaner.db` on POSIX environments.
+- **Tables**:
+  - `chats`: Chat records, title, type, and synchronization checkpoints.
+  - `messages`: Normalized message attributes, timestamps, sender IDs, forwarding metadata, and raw JSON payloads.
+  - `media_hashes`: Precomputed SHA-256 binary digests and perceptual difference hashes (dHash).
+  - `deletion_candidates`: Candidate records flagged for review with reason codes and retention designations.
+  - `backups`: Pre-deletion backup ledger records with file paths and SHA-256 checksums.
 
-**Dual backends with auto-probing.** Google AI Studio documents both the
-`/v1beta/interactions` endpoint (flagged for breaking changes) and the older
-`:generateContent` endpoint. Availability varies across accounts and regions.
-`extract/gemini.py` attempts `interactions` first, falls back to
-`generate_content` on HTTP 400 or 404, and records the working endpoint in
-the SQLite `meta` table to skip subsequent probes. When Google finalizes
-migration to one format, adjusting configuration resolves the change without code
-rewrites.
+### 2.3 Analysis & Deduplication Engines
 
-### 3.3 Deduplication
+The analysis tier uses multi-stage inspection to categorize target messages without data loss.
 
-Three sequential tiers execute from cheapest to most computationally intensive:
+1. **Exact & Fuzzy Deduplication (`tg_cleaner.analyzer.dedupe`)**:
+   - Matches identical text payloads using normalized SHA-256 hashing.
+   - Computes RapidFuzz token sort ratios for minor variations.
+   - Groups forwarded message chains sharing origin message IDs.
 
-**Tier 1: Canonical URL equality.** A SHA-256 hash of the canonicalized
-application URL (tracking parameters removed, host lowercased, and query
-parameters sorted in `core/urls.py`), indexed as `UNIQUE` in SQLite.
-This provides O(1) lookups with zero false positives.
+2. **Same-Media Different-Caption Analysis**:
+   - Evaluates media assets using exact file hashes or 64-bit perceptual dHash values (Hamming distance threshold <= 3).
+   - Identifies instances where an identical image or document is shared across multiple messages with updated text or notes.
+   - Offers retention designations: `KEEP_NEWEST`, `KEEP_LONGEST`, `KEEP_OLDEST`, and `WHITELIST_ALL`.
 
-**Tier 2: MinHash and banded LSH over word 5-shingles.** Catches listings
-cross-posted across different URLs with minor wording variations, such as
-ads published concurrently on departmental pages and job boards.
+3. **Link Health Prober (`tg_cleaner.analyzer.links`)**:
+   - Extracts HTTP and HTTPS URIs from message bodies and entity attributes.
+   - Issues asynchronous HEAD probes with automatic GET fallback to detect HTTP 404, 410, and DNS resolution failures.
+   - Inspects `t.me/+...` and `t.me/joinchat/...` invite links using Telethon `CheckChatInviteRequest` without joining target chats.
 
-For two token sets with Jaccard similarity `s` and a random permutation `h`,
-`P[min h(A) = min h(B)] = s`. Averaging over `num_perm=128` independent
-permutations yields an unbiased estimator with standard error ≈ 1/√128 ≈ 0.088.
-Because of this variance, Tier 3 provides secondary validation.
+4. **Network Security & SSRF Protection (`tg_cleaner.core.net_security`)**:
+   - Validates target link destinations before making network requests.
+   - Blocks requests to loopback addresses, private RFC 1918 subnets, carrier-grade NAT blocks, cloud metadata IP addresses (`169.254.169.254`), and link-local ranges.
+   - Supports routing external probes through isolated edge relay proxies.
 
-Banded Locality-Sensitive Hashing (LSH) divides the 128-value signature into `b`
-bands of `r` rows (`b·r = 128`). Two items become candidate pairs if at least
-one band matches identically:
+5. **Policy & Stub Auditor (`tg_cleaner.analyzer.policy`)**:
+   - Detects messages flagged by Telegram for platform or copyright restrictions (`restriction_reason`).
+   - Identifies orphaned messages sent by deleted accounts (`Deleted Account`).
+   - Identifies empty media envelopes and damaged attachments.
 
-```
-P(candidate | s) = 1 - (1 - s^r)^b
-```
+### 2.4 Safety Protocol & Paced Deletion
 
-`core/minhash.py::_choose_bands` calculates `(b, r)` by numerically minimizing
-the integral error against the default threshold (0.82). The standard library
-implementation requires under 220 lines of arithmetic. Word 5-shingles prevent
-the saturation common to character n-grams on longer descriptions. Ads under
-24 words fall back to character trigrams to ensure sufficient signal.
+Destructive actions are guarded by strict verification steps.
 
-**Tier 3: Fuzzy composite key.** Addresses brief social media posts lacking full
-job descriptions. The system normalizes institution, title, and supervisor names
-(stripping punctuation and sorting tokens), then calculates similarity with
-`rapidfuzz.token_sort_ratio` (falling back to standard library Levenshtein
-distance when optional dependencies are absent). Comparisons are partitioned by
-the institution's primary token and restricted to a 14-day deadline window to
-prevent false positives between distinct departmental openings.
+1. **Verifiable Pre-Deletion Backup (`tg_cleaner.cleaner.backup`)**:
+   - Before any message deletion, extracts all candidate records into a standalone JSON backup archive under `backups/chat_<chat_id>_<timestamp>.json`.
+   - Computes SHA-256 checksum of the serialized payload and records it in the database ledger.
+   - Verifies the backup on disk immediately after creation. If verification fails, the operation aborts before deleting any remote content.
 
-### 3.4 Storage
+2. **Paced Execution (`tg_cleaner.cleaner.executor`)**:
+   - Batches deletion calls in increments capped at 100 message IDs.
+   - Introduces randomized jitter delays (1.2 to 2.5 seconds) between calls.
+   - Traps Telegram `FloodWaitError` responses and sleeps for the required duration plus one second.
 
-| Option | Cost | Query capability | Git-friendliness |
-|---|---|---|---|
-| Managed Postgres | Non-zero | Full SQL | N/A |
-| SQLite committed as binary | Free | Full SQL | Poor (binary churn on every commit) |
-| SQLite cache + committed NDJSON journal | Free | Full SQL cache, diffable history | High |
+3. **Cloud Export (`tg_cleaner.cleaner.cloud_export`)**:
+   - Optionally transfers local backup archives to external S3-compatible object stores or WebDAV targets before deletion.
 
-**Design: SQLite (Schema v5) acts as an ephemeral cache; `data/listings.ndjson`
-serves as the committed source of truth.** Git stores complete compressed blobs
-for modified binary files. Because SQLite modifies B-tree pages on write, committing
-the raw database produces merge conflicts and inflates repository size. The NDJSON
-journal appends cleanly, produces readable diffs, and merges safely in version control.
+### 2.5 Presentation & Operator Interfaces
 
-`state.py::restore_if_needed` reconstructs the SQLite database from the NDJSON journal
-when initializing fresh clones, running on ephemeral runners, or recovering from corruption.
+1. **Command-Line Interface (`tg_cleaner.cli`)**:
+   - Built on Typer with Rich terminal output.
+   - Provides commands for `login`, `sync`, `import`, `scan`, `delete`, `backups`, and `web`.
 
-**Schema v5 Optimizations**:
-- **Partial covering index (`ix_listings_active`)**: Indexes `(status, first_seen_at DESC) WHERE status = 'active'` so dashboard generation and public queries scan only live records without reading closed or expired rows.
-- **Pending recovery index (`ix_listings_pending`)**: Indexes `(status, first_seen_at ASC) WHERE status = 'pending'` to accelerate pending item recovery after workflow interruptions.
-- **Identity expression index (`ix_listings_identity`)**: Indexes `(lower(institution), lower(title))` for O(1) candidate matching in fuzzy deduplication.
-- **Decision index (`ix_seen_items_decision`)**: Indexes `(decision, item_hash)` to accelerate repeated gating lookups.
-- **High-performance PRAGMAs**: Connection initialization configures `PRAGMA mmap_size = 268435456` (256 MB memory-mapped I/O), `PRAGMA cache_size = -65536` (64 MB page cache), `PRAGMA busy_timeout = 10000` (10s lock timeout), and `PRAGMA temp_store = MEMORY`.
+2. **Embedded Web Cockpit (`tg_cleaner.web`)**:
+   - FastAPI asynchronous server serving a buildless client-side SPA.
+   - Uses Alpine.js for reactive state and Tailwind CSS for utility styling.
+   - Includes a Command Palette (`Ctrl+K`), visual diff studio for captions, telemetry ribbon, raw message JSON inspector, and full offline mock sandbox mode.
 
-### 3.5 Orchestration
-
-| Option | Cost | Constraints |
-|---|---|---|
-| Dedicated server or container | Recurring cost | Continuous infrastructure maintenance |
-| Scheduled GitHub Actions | Free for public repositories | Ephemeral environment requiring state commits |
-| Serverless functions (Lambda, Cloud Functions) | Free tier limits | Additional external credentials and deployment complexity |
-
-**Design: Scheduled GitHub Actions cron.** Workflows execute within the
-repository that hosts the dashboard and registry, using built-in secret
-management. Daily operation is bounded by external model quotas rather than
-Actions runner minutes (documented in `REVIEW.md` F4).
-
-### 3.6 Broadcasting and Publishing
-
-| Channel | Format | Capabilities | Error Handling |
-|---|---|---|---|
-| Telegram Channel | HTML message cards and paged digests | Formatted title, institution, deadline, visa rules, and application link. Inline buttons (Interested, Dismiss, Applied). | Configuration errors keep listings in `pending` state for retry. Transient errors do not drop listings. |
-| X/Twitter Feed | 280-character structured tweets | Formatted title, institution, application URL, and targeted hashtags (`#EconTwitter #Predoc`). | OAuth 1.0a or OAuth 2.0 user context. Duplicate or rate-limited posts fail without halting the pipeline. |
-| GitHub Pages | Static JSON and interactive HTML | Client-side search and filtering across region, status, and deadline. | Regenerated locally or via Actions workflow. |
-| RSS Syndication | Atom / RSS 2.0 XML | Standard syndication feed for RSS readers. | Exported directly from active listings. |
-
-## 4. Data flow per item
-
-```
-RawItem (source, url, text)
-   |
-   v
-seen_items lookup (url_hash) -> already judged with same content? -> skip
-   |  no
-   v
-gating.evaluate() -> fails? -> mark_seen(rejected, reason) -> stop
-   |  passes (rule_score computed)
-   v
-Extractor.extract() -> quota/rate-limit exhausted? -> stop run cleanly,
-   |  resume tomorrow (item is NOT marked seen)
-   v
-ExtractionResult (loose wire schema)
-   |
-   v
-coerce() -> not a vacancy, or missing title/institution? -> mark_seen
-   |  ok (strict PredocListing)
-   v
-confidence = blend(model_confidence, rule_score) -> below threshold? ->
-   |                                                mark_seen(rejected)
-   v
-Tier 1: URL hash lookup -> match? -> mark_seen(duplicate), add alt source
-   |  no match
-   v
-Tier 2/3: Deduplicator.find() -> match? -> mark_seen(duplicate), add alt source
-   |  no match
-   v
-insert_listing(status=pending) + mark_seen(accepted, listing_id)
-   |
-   v
-[after all items processed]
-   |
-   v
-Broadcast (Telegram & X) -> success? -> mark_published
-                         -> permanent failure? -> mark_undeliverable
-                         -> transient failure? -> stays pending, retried next run
-```
-
-## 5. Scaling beyond zero-cost
-
-The pipeline currently runs with scale caps configured for high-volume collection:
-2,500 detail enrichments, 12 concurrent source workers, 25 detail workers, and a
-10,000 daily LLM request quota. If higher volume is needed in the future:
-
-1. **Raise the LLM daily budget.** A paid API tier scales extraction linearly.
-   `RateLimiter` and extraction backends accept quota parameters directly through
-   environment variables.
-2. **Expand feed and portal sources.** Adding sources carries zero financial cost.
-   New sources require verification (`sources verify`) and URL link patterns for
-   ATS portals.
-3. **Enable optional scrapers (`jobspy` and `twscrape`).** These expand reach but
-   introduce ToS risks and maintenance overhead as target HTML changes. Consult
-   `COMPLIANCE.md` before activation.
-4. **Adopt paid X API search endpoints.** If public scraping becomes unreliable,
-   official search endpoints provide stable access at paid tier rates.
-5. **Deploy dedicated background runners.** If sub-daily polling becomes necessary,
-   workflows can migrate to an always-on container. Daily batch execution on
-   GitHub Actions remains sufficient for academic recruitment cycles.
-
-## 6. Risk register
-
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Provider changes extraction API schema | Medium (occurred once during initial development) | Extraction fails until updated | Dual-backend auto-probing absorbs backward-compatible changes; distinct API formats require a targeted `_Backend` subclass isolated to `extract/` |
-| Provider rate limits fall below configured targets | Medium (provider limits vary dynamically) | Rate limit errors (HTTP 429) | `RateLimiter` respects HTTP 429 `RetryInfo` headers over local estimates; `--safety-margin` defaults to 90% of configured quotas |
-| Source markup changes, yielding zero items silently | High over time (standard web scraping entropy) | Undetected coverage loss | `_maybe_alert` in `pipeline.py` flags sources that fetch successfully but yield zero items once 3+ sources do so in a single run; `docs/data/health.json` publishes per-source yields to the dashboard |
-| Telegram bot token leaked or revoked | Low | Broadcast posts halt | Tokens reside exclusively in GitHub Secrets; `export_feed()` publishes identical data to RSS independently of Telegram |
-| Optional scraper account or IP suspended | Medium (when optional collectors are active) | Targeted source becomes inactive | Scrapers are disabled by default; `gather()` isolates collector exceptions so individual failures do not block the pipeline |
-| Journal file expands over multi-year operations | Low near-term, moderate long-term | Slower repository clones and imports | `prune()` purges `seen_items` and `dlq` records past retention limits; `expire_past_deadline` archives inactive listings |
+3. **Standalone Desktop Executable (`scripts/build_exe.py`)**:
+   - Packages the application into a single self-contained Windows executable (`dist/TelegramArchiveCleaner.exe`) via PyInstaller.
+   - Bundles all required static web assets and schemas for offline operation.

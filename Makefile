@@ -1,5 +1,4 @@
-.PHONY: install install-dev test test-core test-integration smoke lint typecheck \
-        verify-sources dashboard run vacuum single-file clean
+.PHONY: install install-dev test lint format web scan build-exe clean
 
 PY := python3
 
@@ -7,52 +6,26 @@ install:
 	$(PY) -m pip install -e .
 
 install-dev:
-	$(PY) -m pip install -e ".[dev]"
+	$(PY) -m pip install -e ".[dev,optional]"
 
-# Runs everywhere -- stdlib only, no installed dependencies required.
-test-core:
-	PYTHONPATH=src $(PY) -m unittest discover -s tests/core -t . -v
-
-# Full suite, including integration tests that need httpx/pydantic/respx.
-# Individual integration modules skip themselves cleanly if deps are absent.
 test:
-	PYTHONPATH=src $(PY) -m pytest tests/ -v
-
-test-integration:
-	PYTHONPATH=src $(PY) -m pytest tests/integration -v
-
-# Offline self-check: no network, no credentials required.
-smoke:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli smoke
-
-eval:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli eval
+	$(PY) -m pytest tests/ -v
 
 lint:
 	ruff check src tests
 
-typecheck:
-	mypy src
+format:
+	ruff format src tests
 
-verify-sources:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli sources verify
+web:
+	$(PY) -m tg_cleaner.cli web --host 0.0.0.0 --port 8000
 
-dashboard:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli dashboard
+scan:
+	$(PY) -m tg_cleaner.cli scan me
 
-run:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli run
-
-run-dry:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli run --dry-run
-
-vacuum:
-	PYTHONPATH=src $(PY) -m predoc_pipeline.cli vacuum
-
-# Regenerate the single-file materializer (compile_project.py) from src/.
-single-file:
-	$(PY) tools/build_single_file.py
+build-exe:
+	$(PY) scripts/build_exe.py
 
 clean:
 	find . -name '__pycache__' -exec rm -rf {} +
-	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage
+	rm -rf .pytest_cache .ruff_cache build dist data/*.db-wal data/*.db-shm

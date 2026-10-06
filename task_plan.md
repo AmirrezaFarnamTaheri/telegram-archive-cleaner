@@ -25,14 +25,14 @@ Transform the repository into an end-to-end, privacy-respecting Telegram Archive
 
 | Phase | Description | Status | Verification Gate |
 |---|---|---|---|
-| **Phase 1: Foundation & Staging DB** | SQLite WAL staging database, Pydantic settings, proxy config, models, repo cleanup | ✅ Complete | `pytest tests/test_db.py` (4 passed) |
-| **Phase 2: Perceptual Hashing & Text Proc** | dHash computation (Pillow), Hamming distance, Unicode NFKC normalization, Levenshtein token sorting | ✅ Complete | `pytest tests/test_hashing.py` (8 passed) |
-| **Phase 3: Ingestion Subsystem** | Telethon MTProto live iterator (`live.py`) & Desktop `result.json` parser (`desktop_export.py`) | ✅ Complete | `pytest tests/test_ingest.py` (2 passed) |
-| **Phase 4: Deduplication Engine** | Exact text/media dedupe, fuzzy token sort, **same media/different caption** grouping & retention presets | ✅ Complete | `pytest tests/test_dedupe.py` (3 passed) |
-| **Phase 5: Link, Policy & Stale Analyzers** | Async HTTP link checker (404/410), Telegram invite validator (`CheckChatInviteRequest`), policy restriction auditor, optional LLM pass | ✅ Complete | `pytest tests/test_analyzers.py` (4 passed) |
-| **Phase 6: Backup & Paced Deletion** | Pre-deletion JSON backup generator with SHA-256 verification, paced batch deletion runner, FloodWait backoff | ✅ Complete | `pytest tests/test_cleaner.py` (4 passed) |
-| **Phase 7: FastAPI Web Dashboard & UI** | Embedded SPA dashboard (Tailwind + Alpine.js), REST & SSE live scanning endpoints, diff viewer modal | ✅ Complete | `pytest tests/test_web.py` (6 passed) |
-| **Phase 8: CLI & End-to-End Verification** | Typer CLI (`tg-cleaner web`, `import`, `scan`, `delete`, `backups`), E2E pipeline verification | ✅ Complete | `pytest tests/test_cli.py` (2 passed), `pytest tests/test_e2e_flow.py` (1 passed) |
+| **Phase 1: Foundation & Staging DB** | SQLite WAL staging database, Pydantic settings, proxy config, models, repo cleanup | [x] Complete | `pytest tests/test_db.py` (4 passed) |
+| **Phase 2: Perceptual Hashing & Text Proc** | dHash computation (Pillow), Hamming distance, Unicode NFKC normalization, Levenshtein token sorting | [x] Complete | `pytest tests/test_hashing.py` (8 passed) |
+| **Phase 3: Ingestion Subsystem** | Telethon MTProto live iterator (`live.py`) & Desktop `result.json` parser (`desktop_export.py`) | [x] Complete | `pytest tests/test_ingest.py` (2 passed) |
+| **Phase 4: Deduplication Engine** | Exact text/media dedupe, fuzzy token sort, **same media/different caption** grouping & retention presets | [x] Complete | `pytest tests/test_dedupe.py` (3 passed) |
+| **Phase 5: Link, Policy & Stale Analyzers** | Async HTTP link checker (404/410), Telegram invite validator (`CheckChatInviteRequest`), policy restriction auditor, optional LLM pass | [x] Complete | `pytest tests/test_analyzers.py` (4 passed) |
+| **Phase 6: Backup & Paced Deletion** | Pre-deletion JSON backup generator with SHA-256 verification, paced batch deletion runner, FloodWait backoff | [x] Complete | `pytest tests/test_cleaner.py` (4 passed) |
+| **Phase 7: FastAPI Web Dashboard & UI** | Embedded SPA dashboard (Tailwind + Alpine.js), REST & SSE live scanning endpoints, diff viewer modal | [x] Complete | `pytest tests/test_web.py` (6 passed) |
+| **Phase 8: CLI & End-to-End Verification** | Typer CLI (`tg-cleaner web`, `import`, `scan`, `delete`, `backups`), E2E pipeline verification | [x] Complete | `pytest tests/test_cli.py` (2 passed), `pytest tests/test_e2e_flow.py` (1 passed) |
 
 ---
 

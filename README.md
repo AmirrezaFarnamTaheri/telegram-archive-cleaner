@@ -1,6 +1,6 @@
 # Telegram Archive Cleaner (tg-cleaner)
 
-[![CI](https://github.com/AmirrezaFarnamTaheri/predoc-not-org/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirrezaFarnamTaheri/predoc-not-org/actions/workflows/ci.yml)
+[![CI](https://github.com/AmirrezaFarnamTaheri/telegram-archive-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/AmirrezaFarnamTaheri/telegram-archive-cleaner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-brightgreen.svg)](https://www.python.org/)
 

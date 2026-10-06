@@ -27,7 +27,7 @@ The **Telegram Archive Cleaner** is a comprehensive, local-first system designed
 - **REQ-009**: Provide a Typer CLI interface for headless server hosting, scanning, and cleaning.
 - **SEC-001**: **Zero Data Loss Guarantee**: Create an atomic, verified JSON snapshot in `backups/` containing all message data before executing any deletion RPC.
 - **SEC-002**: Never commit or expose Telegram `.session` credentials or message backups.
-- **CON-001**: Rate limit deletion RPCs to max 100 message IDs per call with 1.2s–2.5s jittered delays, automatically sleeping on `FloodWaitError`.
+- **CON-001**: Rate limit deletion RPCs to max 100 message IDs per call with 1.2s - 2.5s jittered delays, automatically sleeping on `FloodWaitError`.
 - **CON-002**: No Node.js/npm dependencies required to run the local web dashboard.
 - **CON-003**: Support low-data mode (`DATA_SAVER_MODE=true`) and cloud relay hosting (Railway, Docker, Cloudflare Tunnel, MTProxy/SOCKS5).
 - **PAT-001**: Decoupled SQLite Staging Cache: All messages staged locally before analysis; analysis runs completely offline.
@@ -40,12 +40,12 @@ The **Telegram Archive Cleaner** is a comprehensive, local-first system designed
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Implement Settings with proxy tuple builder (`src/tg_cleaner/core/settings.py`) | ✅ | 2026-10-06 |
-| TASK-002 | Implement core models for messages, flags, groups, presets (`src/tg_cleaner/core/models.py`) | ✅ | 2026-10-06 |
-| TASK-003 | Implement DatabaseManager with WAL mode, indexes, and CRUD (`src/tg_cleaner/core/db.py`) | ✅ | 2026-10-06 |
-| TASK-004 | Clean legacy predoc scrapers, build scripts, and test files | ✅ | 2026-10-06 |
-| TASK-005 | Add Dockerfile, docker-compose, railway.toml, Procfile, and relay docs | ✅ | 2026-10-06 |
-| TASK-006 | Run database unit tests (`tests/test_db.py`) | ✅ | 2026-10-06 |
+| TASK-001 | Implement Settings with proxy tuple builder (`src/tg_cleaner/core/settings.py`) | [x] | 2026-10-06 |
+| TASK-002 | Implement core models for messages, flags, groups, presets (`src/tg_cleaner/core/models.py`) | [x] | 2026-10-06 |
+| TASK-003 | Implement DatabaseManager with WAL mode, indexes, and CRUD (`src/tg_cleaner/core/db.py`) | [x] | 2026-10-06 |
+| TASK-004 | Clean legacy prototype scrapers, build scripts, and test files | [x] | 2026-10-06 |
+| TASK-005 | Add Dockerfile, docker-compose, railway.toml, Procfile, and relay docs | [x] | 2026-10-06 |
+| TASK-006 | Run database unit tests (`tests/test_db.py`) | [x] | 2026-10-06 |
 
 ### Implementation Phase 2: Perceptual Hashing & Text Utilities
 
@@ -174,7 +174,7 @@ The **Telegram Archive Cleaner** is a comprehensive, local-first system designed
 
 ## 7. Risks & Assumptions
 
-- **RISK-001**: Telegram `FloodWaitError` when deleting large quantities of messages. Mitigation: 100-batch cap, 1.2s–2.5s jittered delays, catch `FloodWaitError` and sleep `e.seconds + 1`.
+- **RISK-001**: Telegram `FloodWaitError` when deleting large quantities of messages. Mitigation: 100-batch cap, 1.2s - 2.5s jittered delays, catch `FloodWaitError` and sleep `e.seconds + 1`.
 - **RISK-002**: Accidental deletion of valuable messages. Mitigation: Mandatory verified local JSON backup in `backups/` before deletion; dry-run mode enabled by default.
 - **ASSUMPTION-001**: User has a Telegram account and can obtain `api_id` and `api_hash` from `my.telegram.org` or has an exported `result.json` from Telegram Desktop.
 

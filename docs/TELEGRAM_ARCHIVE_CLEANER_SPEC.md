@@ -1,4 +1,4 @@
-# Telegram Archive Cleaner — Deep Research, Ideation & Architectural Spec
+# Telegram Archive Cleaner  -  Deep Research, Ideation & Architectural Spec
 
 **Project**: Telegram Archive Cleaner  
 **Repository**: [D:/github/telegram-archive-cleaner](file:///D:/github/telegram-archive-cleaner)  
@@ -137,9 +137,9 @@ Telegram offers two primary APIs with radically different permission models:
   - Paced batch deletion with live progress indicator.
 
 ### 3.4 What We Are NOT Doing (Explicit Non-Goals)
-- ❌ **Not doing continuous background deletion bots**: This is an intentional, user-supervised curation and cleaning app, not a headless cron bot that silently deletes data while the user sleeps.
-- ❌ **Not downloading full multi-gigabyte video files**: Media deduplication is performed using Telegram media metadata (size, duration, mime, thumbnail hash) to conserve bandwidth.
-- ❌ **Not building a cloud SaaS / hosted multi-tenant server**: The application runs 100% locally on the user's machine to safeguard personal Telegram session credentials and message privacy.
+- [x] **Not doing continuous background deletion bots**: This is an intentional, user-supervised curation and cleaning app, not a headless cron bot that silently deletes data while the user sleeps.
+- [x] **Not downloading full multi-gigabyte video files**: Media deduplication is performed using Telegram media metadata (size, duration, mime, thumbnail hash) to conserve bandwidth.
+- [x] **Not building a cloud SaaS / hosted multi-tenant server**: The application runs 100% locally on the user's machine to safeguard personal Telegram session credentials and message privacy.
 
 ---
 
@@ -226,7 +226,7 @@ telegram-archive-cleaner/
 
 1. **Step 1: Clean Foundation & Dependency Alignment**
    - Retain proven primitives from the codebase: `httpx`, `rapidfuzz`, `pydantic`, `pydantic-settings`, `structlog`, `typer`.
-   - Add `telethon` (v1.36+) and `fastapi` + `uvicorn`. Remove unused job-board scraping dependencies.
+   - Add `telethon` (v1.36+) and `fastapi` + `uvicorn`. Ensure dependencies align with core architecture.
 2. **Step 2: Database & Model Layer**
    - Create SQLite staging database storing raw messages and analysis tags (`is_duplicate`, `is_stale`, `is_policy_deleted`, `duplicate_group_id`, etc.).
 3. **Step 3: Ingestion Subsystem**

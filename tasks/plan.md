@@ -8,7 +8,7 @@ The Telegram Archive Cleaner is a privacy-first, visual audit and cleanup utilit
 - **Remote Relay & Low-Data Mode:** Supports deployment to Railway, behind Cloudflare Tunnels, or routing through SOCKS5/MTProxy relays so users can audit massive archives without consuming local internet data.
 - **Zero-Download Media Fingerprinting:** Deduplicates photos and files using Telegram asset IDs (`photo.id`, `document.id`), `(size, mime, duration, dimensions)` tuples, and micro-thumbnails (`thumb=0`) via Pillow perceptual difference hashing (`dHash`).
 - **Same Media / Different Captions Engine:** Detects and clusters media with divergent captions, presenting word/character diffs, length deltas, and 4 retention presets (`KEEP_NEWEST`, `KEEP_LONGEST`, `KEEP_OLDEST`, `WHITELIST_ALL`).
-- **Ironclad Safety Protocol:** Mandatory pre-deletion JSON backup written to `backups/chat_<chat_id>_<timestamp>.json` with SHA-256 verification before deletion RPCs are allowed; 100-msg batch cap with 1.2s–2.5s jittered delays and automatic `FloodWaitError` recovery.
+- **Ironclad Safety Protocol:** Mandatory pre-deletion JSON backup written to `backups/chat_<chat_id>_<timestamp>.json` with SHA-256 verification before deletion RPCs are allowed; 100-msg batch cap with 1.2s - 2.5s jittered delays and automatic `FloodWaitError` recovery.
 - **Buildless Embedded Web Dashboard:** FastAPI serves an embedded SPA powered by Tailwind CSS CDN and Alpine.js from `static/`, requiring no Node.js/npm tooling.
 
 ---
@@ -19,7 +19,7 @@ The Telegram Archive Cleaner is a privacy-first, visual audit and cleanup utilit
 - [x] Task 1.1: Database schema, WAL mode, transaction helpers (`src/tg_cleaner/core/db.py`)
 - [x] Task 1.2: Data models (`MessageRecord`, `AnalysisFlag`, `DuplicateGroup`, `RetentionPreset`) (`src/tg_cleaner/core/models.py`)
 - [x] Task 1.3: Pydantic settings with proxy tuple builder (`src/tg_cleaner/core/settings.py`)
-- [x] Task 1.4: Repository cleanup (purged legacy `predoc_pipeline`, obsolete scrapers and databases)
+- [x] Task 1.4: Repository cleanup (purged legacy prototypes, obsolete scrapers and databases)
 - [x] Task 1.5: Remote relay & cloud deployment configs (`Dockerfile`, `docker-compose.yml`, `railway.toml`, `Procfile`, `tunnel.yml.example`)
 
 ### Checkpoint: Foundation
@@ -75,7 +75,7 @@ The Telegram Archive Cleaner is a privacy-first, visual audit and cleanup utilit
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Telegram FloodWait on deletion | High | Enforce max 100 IDs per RPC call, 1.2s–2.5s jittered delays, catch `FloodWaitError` and sleep exact `e.seconds + 1` |
+| Telegram FloodWait on deletion | High | Enforce max 100 IDs per RPC call, 1.2s - 2.5s jittered delays, catch `FloodWaitError` and sleep exact `e.seconds + 1` |
 | Accidental message loss | Critical | Enforce mandatory pre-deletion JSON archive in `backups/` verified before any delete call; dry-run mode enabled by default |
 | High bandwidth on large media | Medium | Zero-download media dedupe using MTProto IDs and micro-thumbnails (`thumb=0`, $< 1\text{ KB}$); support Railway/Cloudflare remote execution |
 | Telegram session invalidation | Medium | Graceful error handling in client wrapper with clear re-auth instructions |
