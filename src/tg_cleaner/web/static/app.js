@@ -28,7 +28,8 @@ function cleanerApp() {
     pageSize: 30,
 
     // Layout & UI Shell
-    sidebarOpen: true,
+    sidebarOpen: typeof window !== 'undefined' ? window.innerWidth >= 768 : true,
+    isMobile: typeof window !== 'undefined' ? window.innerWidth < 768 : false,
     showShortcutsModal: false,
     showOnboardingGuide: false,
 
@@ -68,6 +69,12 @@ function cleanerApp() {
     toastCounter: 0,
 
     async init() {
+      this.isMobile = window.innerWidth < 768;
+      this.sidebarOpen = !this.isMobile;
+      window.addEventListener('resize', () => {
+        this.isMobile = window.innerWidth < 768;
+      });
+
       await this.checkHealth();
       await this.checkAuthStatus();
       await this.checkRelayStatus();
@@ -262,6 +269,9 @@ function cleanerApp() {
 
     async selectChat(chat) {
       this.selectedChat = chat;
+      if (this.isMobile) {
+        this.sidebarOpen = false;
+      }
       this.page = 1;
       await this.loadChatDetails(chat.id);
     },
@@ -591,6 +601,202 @@ function cleanerApp() {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    },
+
+    async generateDemoData() {
+      let backendSuccess = false;
+      try {
+        const demoPayload = {
+          name: 'Telegram Research & Saved Messages',
+          type: 'saved_messages',
+          id: 100000001,
+          messages: [
+            {
+              id: 101,
+              type: 'message',
+              date: '2026-03-01T10:00:00',
+              text: 'Infrastructure backup and credentials key file',
+              media_type: 'photo',
+              file_size: 2450000,
+            },
+            {
+              id: 102,
+              type: 'message',
+              date: '2026-03-01T10:05:00',
+              text: 'Infrastructure backup and credentials key file',
+              media_type: 'photo',
+              file_size: 2450000,
+            },
+            {
+              id: 205,
+              type: 'message',
+              date: '2026-03-10T14:00:00',
+              text: 'Community workshop banner: Saturday 18:00 UTC https://t.me/joinchat/old_expired_link',
+              media_type: 'photo',
+              file_size: 1850000,
+            },
+            {
+              id: 206,
+              type: 'message',
+              date: '2026-03-10T16:30:00',
+              text: 'Community workshop banner (RESCHEDULED): Sunday 19:00 UTC https://t.me/joinchat/new_active_link',
+              media_type: 'photo',
+              file_size: 1850000,
+            },
+            {
+              id: 310,
+              type: 'message',
+              date: '2026-02-15T09:20:00',
+              text: 'Reference documentation: https://example-invalid-domain-404.org/specs.pdf',
+              media_type: 'document',
+              file_size: 512000,
+            },
+            {
+              id: 415,
+              type: 'message',
+              date: '2026-01-20T11:45:00',
+              text: 'Forwarded channel release restricted under Telegram platform terms policy',
+              media_type: null,
+              file_size: 0,
+            }
+          ]
+        };
+
+        const res = await fetch('/api/chats/import-desktop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(demoPayload)
+        });
+
+        if (res.ok) {
+          backendSuccess = true;
+          await this.loadChats();
+          if (this.chats.length > 0) {
+            await this.selectChat(this.chats[0]);
+            await this.runFullScan();
+          }
+        }
+      } catch (e) {
+        // Fallback to client-side mock if backend is offline or opened via file://
+      }
+
+      if (!backendSuccess) {
+        const demoChat = {
+          id: 100000001,
+          title: 'Telegram Research & Saved Messages',
+          chat_type: 'saved_messages',
+          total_messages: 6,
+          last_scanned: new Date().toISOString()
+        };
+        this.chats = [
+          demoChat,
+          {
+            id: 200000002,
+            title: 'Design Engineering Showcase',
+            chat_type: 'channel',
+            total_messages: 128,
+            last_scanned: null
+          }
+        ];
+        this.selectedChat = demoChat;
+        this.stats = {
+          chat_id: demoChat.id,
+          total_messages: 6,
+          exact_duplicates: 2,
+          diff_duplicates: 2,
+          dead_links: 1,
+          policy_flags: 1,
+          total_reclaimable_bytes: 4300000,
+          last_scanned: new Date().toISOString()
+        };
+        this.candidates = [
+          {
+            id: 102,
+            chat_id: demoChat.id,
+            date: '2026-03-01T10:05:00',
+            text: 'Infrastructure backup and credentials key file',
+            media_type: 'photo',
+            file_size: 2450000,
+            flag_type: 'exact_duplicate',
+            reason: 'Identical SHA-256 byte payload to Message #101'
+          },
+          {
+            id: 205,
+            chat_id: demoChat.id,
+            date: '2026-03-10T14:00:00',
+            text: 'Community workshop banner: Saturday 18:00 UTC https://t.me/joinchat/old_expired_link',
+            media_type: 'photo',
+            file_size: 1850000,
+            flag_type: 'diff_duplicate',
+            reason: 'Superseded announcement variant of Message #206'
+          },
+          {
+            id: 310,
+            chat_id: demoChat.id,
+            date: '2026-02-15T09:20:00',
+            text: 'Reference documentation: https://example-invalid-domain-404.org/specs.pdf',
+            media_type: 'document',
+            file_size: 512000,
+            flag_type: 'dead_link',
+            reason: 'HTTP 404 Not Found unreachable target'
+          },
+          {
+            id: 415,
+            chat_id: demoChat.id,
+            date: '2026-01-20T11:45:00',
+            text: 'Forwarded channel release restricted under Telegram platform terms policy',
+            media_type: null,
+            file_size: 0,
+            flag_type: 'policy_violation',
+            reason: 'Flagged for restriction: terms violation'
+          }
+        ];
+        this.selectedCandidateIds = this.candidates.map(c => c.id);
+        this.diffGroups = [
+          {
+            group_id: 'grp_demo_cluster',
+            messages: [
+              {
+                id: 205,
+                chat_id: demoChat.id,
+                date: '2026-03-10T14:00:00',
+                text: 'Community workshop banner: Saturday 18:00 UTC https://t.me/joinchat/old_expired_link',
+                media_type: 'photo',
+                media_id: 'hash_demo_banner'
+              },
+              {
+                id: 206,
+                chat_id: demoChat.id,
+                date: '2026-03-10T16:30:00',
+                text: 'Community workshop banner (RESCHEDULED): Sunday 19:00 UTC https://t.me/joinchat/new_active_link',
+                media_type: 'photo',
+                media_id: 'hash_demo_banner'
+              }
+            ],
+            suggested_keep_id: 206
+          }
+        ];
+        this.backups = [
+          {
+            filename: 'chat_100000001_demo_snapshot.json',
+            created_at: new Date().toISOString(),
+            message_count: 4,
+            sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+            size_bytes: 18432
+          }
+        ];
+      }
+
+      this.showOnboardingGuide = false;
+      if (this.isMobile) {
+        this.sidebarOpen = false;
+      }
+      this.showToast('Loaded interactive demo sandbox with sample Telegram archives', 'success');
     }
   };
+}
+
+// Global export for Alpine.js instantiation
+if (typeof window !== 'undefined') {
+  window.cleanerApp = cleanerApp;
 }

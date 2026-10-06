@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -24,8 +25,22 @@ class DatabaseManager:
     """Manages SQLite staging database with WAL mode and transaction safety."""
 
     def __init__(self, db_path: str = "data/cleaner.db") -> None:
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path = Path(db_path)
+        try:
+            if not target_path.parent.exists():
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+            test_file = target_path.parent / ".perm_check"
+            test_file.touch(exist_ok=True)
+            test_file.unlink(missing_ok=True)
+            self.db_path = target_path
+        except (PermissionError, OSError):
+            app_dir = (
+                Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share")
+                / "TelegramArchiveCleaner"
+            )
+            fallback_dir = app_dir / "data"
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+            self.db_path = fallback_dir / target_path.name
 
     def get_connection(self) -> sqlite3.Connection:
         """Create and configure a SQLite connection."""

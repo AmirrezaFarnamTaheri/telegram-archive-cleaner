@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,8 +20,22 @@ class BackupManager:
     """Manages pre-deletion JSON message backups with SHA-256 integrity verification."""
 
     def __init__(self, backup_dir: str | None = None) -> None:
-        self.backup_dir = Path(backup_dir or settings.backup_dir)
-        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        target_dir = Path(backup_dir or settings.backup_dir)
+        try:
+            if not target_dir.exists():
+                target_dir.mkdir(parents=True, exist_ok=True)
+            test_file = target_dir / ".perm_check"
+            test_file.touch(exist_ok=True)
+            test_file.unlink(missing_ok=True)
+            self.backup_dir = target_dir
+        except (PermissionError, OSError):
+            app_dir = (
+                Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share")
+                / "TelegramArchiveCleaner"
+            )
+            fallback_dir = app_dir / "backups"
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+            self.backup_dir = fallback_dir
 
     def create_backup(self, chat_id: int, message_ids: list[int], db: DatabaseManager) -> Path:
         """Create a verifiable local JSON snapshot of specified messages."""

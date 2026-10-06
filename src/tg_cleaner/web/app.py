@@ -61,7 +61,11 @@ def create_app(
 
     # Static assets and index.html serving
     static_dir = get_static_dir()
-    static_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        if not static_dir.exists():
+            static_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
 
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
@@ -69,8 +73,19 @@ def create_app(
     def serve_index() -> FileResponse:
         index_file = static_dir / "index.html"
         if not index_file.is_file():
-            # Return basic HTML placeholder if index.html is missing
             return FileResponse(__file__)
         return FileResponse(str(index_file))
+
+    @app.get("/app.js")
+    def serve_app_js() -> FileResponse:
+        return FileResponse(str(static_dir / "app.js"))
+
+    @app.get("/alpine.min.js")
+    def serve_alpine_js() -> FileResponse:
+        return FileResponse(str(static_dir / "alpine.min.js"))
+
+    @app.get("/tailwind.min.js")
+    def serve_tailwind_js() -> FileResponse:
+        return FileResponse(str(static_dir / "tailwind.min.js"))
 
     return app
