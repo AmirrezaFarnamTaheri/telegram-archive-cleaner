@@ -1,5 +1,6 @@
 /**
  * Alpine.js application state & controller for Telegram Archive Cleaner
+ * Forensic, accessible, zero-slop architecture with non-blocking toast notifications
  */
 
 function cleanerApp() {
@@ -13,12 +14,23 @@ function cleanerApp() {
     diffGroups: [],
     backups: [],
     activeTab: 'candidates',
+    candidateFilter: 'all',
+    searchQuery: '',
     scanning: false,
     deleting: false,
     dryRunMode: true,
+
+    // Modals
     showImportModal: false,
     showDeleteModal: false,
     showAuthModal: false,
+    showCloudExportModal: false,
+    showMediaModal: false,
+    inspectMediaUrl: '',
+    inspectMediaTitle: '',
+    inspectMediaId: null,
+
+    // MTProto Authentication State
     telegramAuth: false,
     authStep: 'phone',
     authPhone: '',
@@ -26,9 +38,12 @@ function cleanerApp() {
     authPassword: '',
     phoneCodeHash: '',
     authLoading: false,
+
+    // Edge Relay Status
     relayConfigured: false,
     relayProvider: 'Direct Local',
-    showCloudExportModal: false,
+
+    // Cloud Export State
     exportTargetBackup: null,
     cloudProvider: 'github',
     cloudToken: '',
@@ -36,12 +51,36 @@ function cleanerApp() {
     cloudFolderId: '',
     cloudExporting: false,
 
+    // Toast Notification System
+    toasts: [],
+    toastCounter: 0,
+
     async init() {
       await this.checkHealth();
       await this.checkAuthStatus();
       await this.checkRelayStatus();
       await this.loadChats();
       await this.loadBackups();
+    },
+
+    showToast(message, type = 'info', duration = 4000) {
+      const id = ++this.toastCounter;
+      this.toasts.push({ id, message, type });
+      setTimeout(() => {
+        this.removeToast(id);
+      }, duration);
+    },
+
+    removeToast(id) {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+    },
+
+    closeAllModals() {
+      this.showImportModal = false;
+      this.showDeleteModal = false;
+      this.showAuthModal = false;
+      this.showCloudExportModal = false;
+      this.showMediaModal = false;
     },
 
     async checkRelayStatus() {
@@ -52,7 +91,7 @@ function cleanerApp() {
           this.relayConfigured = data.configured === true;
           this.relayProvider = data.provider || 'Direct Local';
         }
-      } catch (e) {
+      } catch {
         this.relayConfigured = false;
       }
     },
@@ -64,7 +103,7 @@ function cleanerApp() {
           const data = await res.json();
           this.telegramAuth = data.authenticated === true;
         }
-      } catch (e) {
+      } catch {
         this.telegramAuth = false;
       }
     },
@@ -78,9 +117,12 @@ function cleanerApp() {
           if (demoChat) {
             await this.selectChat(demoChat);
           }
+          this.showToast('Interactive demo archive loaded successfully', 'success');
+        } else {
+          this.showToast('Failed to load demo data', 'error');
         }
       } catch (err) {
-        alert('Demo generation failed: ' + err.message);
+        this.showToast(`Demo load error: ${err.message}`, 'error');
       }
     },
 
@@ -97,12 +139,13 @@ function cleanerApp() {
           const data = await res.json();
           this.phoneCodeHash = data.phone_code_hash;
           this.authStep = 'code';
+          this.showToast('Verification code dispatched to your Telegram app', 'info');
         } else {
           const err = await res.json();
-          alert('Error sending code: ' + (err.detail || 'Failed'));
+          this.showToast(`Error: ${err.detail || 'Failed to dispatch code'}`, 'error');
         }
       } catch (e) {
-        alert('Network error: ' + e.message);
+        this.showToast(`Network error: ${e.message}`, 'error');
       } finally {
         this.authLoading = false;
       }
@@ -123,7 +166,7 @@ function cleanerApp() {
           }),
         });
         if (res.ok) {
-          alert('Successfully authenticated with Telegram!');
+          this.showToast('Successfully authenticated Telegram MTProto session', 'success');
           this.showAuthModal = false;
           this.telegramAuth = true;
           this.authStep = 'phone';
@@ -132,12 +175,13 @@ function cleanerApp() {
           const err = await res.json();
           if (err.detail && err.detail.includes('2FA')) {
             this.authStep = 'password';
+            this.showToast('Two-Factor Authentication password required', 'warning');
           } else {
-            alert('Sign-in failed: ' + (err.detail || 'Invalid code'));
+            this.showToast(`Sign-in failed: ${err.detail || 'Invalid code'}`, 'error');
           }
         }
       } catch (e) {
-        alert('Sign-in error: ' + e.message);
+        this.showToast(`Sign-in network error: ${e.message}`, 'error');
       } finally {
         this.authLoading = false;
       }
@@ -148,7 +192,7 @@ function cleanerApp() {
         const res = await fetch('/api/health');
         const data = await res.json();
         this.dbHealthy = data.db_healthy === true;
-      } catch (err) {
+      } catch {
         this.dbHealthy = false;
       }
     },
@@ -163,7 +207,7 @@ function cleanerApp() {
           }
         }
       } catch (err) {
-        console.error('Failed to load chats:', err);
+        this.showToast(`Failed to load chat index: ${err.message}`, 'error');
       }
     },
 
@@ -174,33 +218,28 @@ function cleanerApp() {
 
     async loadChatDetails(chatId) {
       try {
-        // Load stats
         const statsRes = await fetch(`/api/chats/${chatId}/stats`);
         if (statsRes.ok) {
           this.stats = await statsRes.json();
         }
 
-        // Load deletion candidates
         const candsRes = await fetch(`/api/chats/${chatId}/candidates`);
         if (candsRes.ok) {
           this.candidates = await candsRes.json();
           this.selectedCandidateIds = this.candidates.map(c => c.id);
         }
 
-        // Load duplicate groups for diff cards
         await this.loadDiffGroups(chatId);
       } catch (err) {
-        console.error('Failed to load chat details:', err);
+        this.showToast(`Failed loading chat records: ${err.message}`, 'error');
       }
     },
 
     async loadDiffGroups(chatId) {
-      // In a full scan, we query groups from DB or populate from candidate flags
       this.diffGroups = [];
       const flagsRes = await fetch(`/api/chats/${chatId}/candidates`);
       if (flagsRes.ok) {
         const msgs = await flagsRes.json();
-        // Check for groups
         const groupMap = {};
         for (const m of msgs) {
           if (m.media_id) {
@@ -220,6 +259,22 @@ function cleanerApp() {
       }
     },
 
+    filteredCandidates() {
+      let list = this.candidates;
+      if (this.candidateFilter === 'exact') {
+        list = list.filter(c => c.media_type && !c.text);
+      } else if (this.candidateFilter === 'diff') {
+        list = list.filter(c => c.media_type && c.text);
+      } else if (this.candidateFilter === 'link') {
+        list = list.filter(c => c.text && c.text.includes('http'));
+      }
+      if (this.searchQuery && this.searchQuery.trim() !== '') {
+        const q = this.searchQuery.toLowerCase();
+        list = list.filter(c => (c.text || '').toLowerCase().includes(q) || String(c.id).includes(q));
+      }
+      return list;
+    },
+
     async runScan() {
       if (!this.selectedChat) return;
       this.scanning = true;
@@ -229,9 +284,13 @@ function cleanerApp() {
           const data = await res.json();
           this.stats = data.stats;
           await this.loadChatDetails(this.selectedChat.id);
+          this.showToast(`Full audit completed: ${this.candidates.length} candidates flagged`, 'success');
+        } else {
+          const err = await res.json();
+          this.showToast(`Audit failed: ${err.detail || 'Server error'}`, 'error');
         }
       } catch (err) {
-        alert('Audit failed: ' + err.message);
+        this.showToast(`Audit failed: ${err.message}`, 'error');
       } finally {
         this.scanning = false;
       }
@@ -246,10 +305,18 @@ function cleanerApp() {
         });
         if (res.ok) {
           await this.loadChatDetails(this.selectedChat.id);
+          this.showToast(`Preset "${preset}" applied to group ${groupId}`, 'info');
         }
       } catch (err) {
-        console.error('Failed to apply preset:', err);
+        this.showToast(`Failed to update preset: ${err.message}`, 'error');
       }
+    },
+
+    openMediaInspect(chatId, msgId, title) {
+      this.inspectMediaUrl = `/api/media/${chatId}/${msgId}`;
+      this.inspectMediaTitle = title || `Message #${msgId} Visual Inspection`;
+      this.inspectMediaId = msgId;
+      this.showMediaModal = true;
     },
 
     async executeBatchDelete() {
@@ -268,16 +335,16 @@ function cleanerApp() {
         if (res.ok) {
           const result = await res.json();
           const modeStr = result.dry_run ? 'Dry Run Simulation' : 'Live Deletion';
-          alert(`${modeStr} finished! ${result.deleted_count} messages processed. Verified backup saved to: ${result.backup_file}`);
+          this.showToast(`${modeStr} finished: ${result.deleted_count} messages processed. Verified backup created.`, 'success', 5000);
           this.showDeleteModal = false;
           await this.loadChatDetails(this.selectedChat.id);
           await this.loadBackups();
         } else {
           const err = await res.json();
-          alert('Deletion failed: ' + (err.detail || 'Unknown error'));
+          this.showToast(`Execution halted: ${err.detail || 'Unknown error'}`, 'error');
         }
       } catch (err) {
-        alert('Deletion error: ' + err.message);
+        this.showToast(`Deletion error: ${err.message}`, 'error');
       } finally {
         this.deleting = false;
       }
@@ -298,15 +365,15 @@ function cleanerApp() {
 
         if (res.ok) {
           const data = await res.json();
-          alert(`Successfully imported "${data.title}" (${data.imported_count} messages)!`);
+          this.showToast(`Imported archive: "${data.title}" (${data.imported_count} messages)`, 'success');
           this.showImportModal = false;
           await this.loadChats();
         } else {
           const err = await res.json();
-          alert('Import failed: ' + (err.detail || 'Invalid file'));
+          this.showToast(`Import rejected: ${err.detail || 'Invalid archive structure'}`, 'error');
         }
       } catch (err) {
-        alert('File upload error: ' + err.message);
+        this.showToast(`Upload error: ${err.message}`, 'error');
       }
     },
 
@@ -317,7 +384,7 @@ function cleanerApp() {
           this.backups = await res.json();
         }
       } catch (err) {
-        console.error('Failed to load backups:', err);
+        this.showToast(`Failed to load backup archive: ${err.message}`, 'error');
       }
     },
 
@@ -343,16 +410,25 @@ function cleanerApp() {
         });
         if (res.ok) {
           const result = await res.json();
-          alert(`Successfully exported to ${result.provider}! Target: ${result.target_path}\nChecksum: ${result.sha256.slice(0, 16)}...`);
+          this.showToast(`Offsite export complete to ${result.provider} (${result.target_path})`, 'success', 5000);
           this.showCloudExportModal = false;
         } else {
           const err = await res.json();
-          alert('Export failed: ' + (err.detail || 'Server error'));
+          this.showToast(`Cloud export failed: ${err.detail || 'Server rejected export'}`, 'error');
         }
       } catch (err) {
-        alert('Cloud export error: ' + err.message);
+        this.showToast(`Export error: ${err.message}`, 'error');
       } finally {
         this.cloudExporting = false;
+      }
+    },
+
+    async copyToClipboard(text, label = 'Checksum') {
+      try {
+        await navigator.clipboard.writeText(text);
+        this.showToast(`${label} copied to clipboard`, 'info');
+      } catch {
+        this.showToast('Failed to copy to clipboard', 'warning');
       }
     },
 
@@ -363,10 +439,11 @@ function cleanerApp() {
         await this.loadChatDetails(this.selectedChat.id);
       }
       await this.loadBackups();
+      this.showToast('Workspace synchronized with database', 'info');
     },
 
     selectAllCandidates() {
-      this.selectedCandidateIds = this.candidates.map(c => c.id);
+      this.selectedCandidateIds = this.filteredCandidates().map(c => c.id);
     },
 
     deselectAllCandidates() {
