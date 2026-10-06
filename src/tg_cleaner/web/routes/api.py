@@ -360,6 +360,14 @@ class AuthSendCodeRequest(BaseModel):
     """Payload to request Telegram login code."""
 
     phone: str
+    api_id: int | None = None
+    api_hash: str | None = None
+    proxy_type: str | None = None
+    proxy_host: str | None = None
+    proxy_port: int | None = None
+    proxy_username: str | None = None
+    proxy_password: str | None = None
+    proxy_secret: str | None = None
 
 
 class AuthSignInRequest(BaseModel):
@@ -371,30 +379,107 @@ class AuthSignInRequest(BaseModel):
     password: str | None = None
 
 
+class AuthCredentialsRequest(BaseModel):
+    """Payload to configure and persist Telegram API credentials and proxy settings."""
+
+    api_id: int | None = None
+    api_hash: str | None = None
+    phone: str | None = None
+    proxy_type: str | None = None
+    proxy_host: str | None = None
+    proxy_port: int | None = None
+    proxy_username: str | None = None
+    proxy_password: str | None = None
+    proxy_secret: str | None = None
+
+
 @router.get("/auth/status")
 async def get_auth_status(request: Request) -> dict[str, Any]:
-    """Check Telegram client connection and authorization status."""
+    """Check Telegram client connection, credentials and authorization status."""
+    from tg_cleaner.core.settings import settings
+
+    has_creds = bool(settings.telegram_api_id and settings.telegram_api_hash)
+    proxy_configured = bool(settings.telegram_proxy_type and settings.telegram_proxy_host)
     try:
         from tg_cleaner.core.auth import TelegramAuthManager
 
         auth = TelegramAuthManager()
-        is_auth = await auth.is_authorized()
-        return {"authenticated": is_auth}
+        is_auth = await auth.is_authorized() if has_creds else False
+        return {
+            "authenticated": is_auth,
+            "has_credentials": has_creds,
+            "api_id": settings.telegram_api_id,
+            "phone": settings.telegram_phone,
+            "proxy_configured": proxy_configured,
+            "proxy_type": settings.telegram_proxy_type,
+            "proxy_host": settings.telegram_proxy_host,
+            "proxy_port": settings.telegram_proxy_port,
+        }
     except Exception as e:
-        return {"authenticated": False, "error": str(e)}
+        return {
+            "authenticated": False,
+            "has_credentials": has_creds,
+            "proxy_configured": proxy_configured,
+            "error": str(e),
+        }
+
+
+@router.post("/auth/credentials")
+async def save_auth_credentials(payload: AuthCredentialsRequest) -> dict[str, Any]:
+    """Persist Telegram API credentials and proxy configuration to environment and memory."""
+    from tg_cleaner.core.auth import TelegramAuthManager
+    from tg_cleaner.core.settings import update_credentials_and_save
+
+    update_credentials_and_save(
+        api_id=payload.api_id,
+        api_hash=payload.api_hash,
+        phone=payload.phone,
+        proxy_type=payload.proxy_type,
+        proxy_host=payload.proxy_host,
+        proxy_port=payload.proxy_port,
+        proxy_username=payload.proxy_username,
+        proxy_password=payload.proxy_password,
+        proxy_secret=payload.proxy_secret,
+    )
+    TelegramAuthManager().reset_client()
+    return {"status": "ok"}
 
 
 @router.post("/auth/send-code")
 async def auth_send_code(payload: AuthSendCodeRequest) -> dict[str, Any]:
     """Request a login verification code via Telegram."""
-    try:
-        from tg_cleaner.core.auth import TelegramAuthManager
+    from tg_cleaner.core.auth import TelegramAuthManager
+    from tg_cleaner.core.settings import settings, update_credentials_and_save
 
+    if payload.api_id or payload.api_hash or payload.proxy_host:
+        update_credentials_and_save(
+            api_id=payload.api_id,
+            api_hash=payload.api_hash,
+            phone=payload.phone,
+            proxy_type=payload.proxy_type,
+            proxy_host=payload.proxy_host,
+            proxy_port=payload.proxy_port,
+            proxy_username=payload.proxy_username,
+            proxy_password=payload.proxy_password,
+            proxy_secret=payload.proxy_secret,
+        )
+
+    if not settings.telegram_api_id or not settings.telegram_api_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="Telegram API credentials missing. Please provide your API ID and API Hash from https://my.telegram.org.",
+        )
+
+    try:
         auth = TelegramAuthManager()
+        auth.reset_client()
         phone_code_hash = await auth.send_login_code(payload.phone)
         return {"phone_code_hash": phone_code_hash}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        msg = str(e)
+        if any(term in msg.lower() for term in ["timeout", "timed out", "connection", "connect", "refused"]):
+            msg += ". If direct access to Telegram MTProto is blocked by your network provider, please configure a SOCKS5 or HTTP proxy in the proxy settings."
+        raise HTTPException(status_code=400, detail=msg) from e
 
 
 @router.post("/auth/sign-in")

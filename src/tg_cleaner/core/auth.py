@@ -19,6 +19,10 @@ class TelegramAuthManager:
         self.session_name = session_name or settings.telegram_session_name
         self._client: Any | None = None
 
+    def reset_client(self) -> None:
+        """Reset cached client instance so updated credentials take effect."""
+        self._client = None
+
     def get_client(self) -> Any:
         """Instantiate or retrieve TelegramClient with proxy configuration."""
         if self._client is not None:
@@ -28,7 +32,7 @@ class TelegramAuthManager:
 
         if not settings.telegram_api_id or not settings.telegram_api_hash:
             raise ValueError(
-                "Telegram API credentials missing. Please set TELEGRAM_API_ID and TELEGRAM_API_HASH in .env"
+                "Telegram API credentials missing. Please configure your API ID and API Hash from https://my.telegram.org in the settings modal or .env file."
             )
 
         proxy = settings.get_proxy_tuple()
@@ -37,6 +41,9 @@ class TelegramAuthManager:
             settings.telegram_api_id,
             settings.telegram_api_hash,
             proxy=proxy,
+            connection_retries=2,
+            retry_delay=1,
+            timeout=8,
         )
         return self._client
 

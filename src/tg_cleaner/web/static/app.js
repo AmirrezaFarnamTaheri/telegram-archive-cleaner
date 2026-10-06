@@ -58,6 +58,17 @@ function cleanerApp() {
     authPassword: '',
     phoneCodeHash: '',
     authLoading: false,
+    authApiId: '',
+    authApiHash: '',
+    authProxyType: '',
+    authProxyHost: '',
+    authProxyPort: '',
+    authProxyUser: '',
+    authProxyPass: '',
+    authProxySecret: '',
+    hasApiCredentials: false,
+    showCredentialsSection: false,
+    showProxySection: false,
 
     // Edge Relay Status
     relayConfigured: false,
@@ -317,6 +328,17 @@ function cleanerApp() {
         if (res.ok) {
           const data = await res.json();
           this.telegramAuth = data.authenticated === true;
+          this.hasApiCredentials = data.has_credentials === true;
+          if (data.api_id) this.authApiId = String(data.api_id);
+          if (data.phone) this.authPhone = data.phone;
+          if (data.proxy_type) this.authProxyType = data.proxy_type;
+          if (data.proxy_host) this.authProxyHost = data.proxy_host;
+          if (data.proxy_port) this.authProxyPort = String(data.proxy_port);
+          if (!this.hasApiCredentials) {
+            this.showCredentialsSection = true;
+          }
+        } else {
+          this.telegramAuth = false;
         }
       } catch {
         this.telegramAuth = false;
@@ -329,21 +351,44 @@ function cleanerApp() {
         this.showToast('Telegram MTProto connection requires launching TelegramArchiveCleaner.exe web', 'warning');
         return;
       }
+      if (!this.hasApiCredentials && (!this.authApiId || !this.authApiHash)) {
+        this.showCredentialsSection = true;
+        this.showToast('Please provide your Telegram API ID and API Hash from my.telegram.org', 'warning');
+        return;
+      }
       this.authLoading = true;
       try {
+        const payload = {
+          phone: this.authPhone.trim(),
+        };
+        if (this.authApiId) payload.api_id = parseInt(this.authApiId, 10);
+        if (this.authApiHash) payload.api_hash = this.authApiHash.trim();
+        if (this.authProxyType && this.authProxyHost) {
+          payload.proxy_type = this.authProxyType;
+          payload.proxy_host = this.authProxyHost.trim();
+          if (this.authProxyPort) payload.proxy_port = parseInt(this.authProxyPort, 10);
+          if (this.authProxyUser) payload.proxy_username = this.authProxyUser.trim();
+          if (this.authProxyPass) payload.proxy_password = this.authProxyPass;
+          if (this.authProxySecret) payload.proxy_secret = this.authProxySecret.trim();
+        }
         const res = await fetch('/api/auth/send-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: this.authPhone }),
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
           const data = await res.json();
           this.phoneCodeHash = data.phone_code_hash;
+          this.hasApiCredentials = true;
           this.authStep = 'code';
           this.showToast('Verification code dispatched to your Telegram app', 'info');
         } else {
           const err = await res.json();
-          this.showToast(`Authentication rejected: ${err.detail || 'Code delivery failed'}`, 'error');
+          const detail = err.detail || 'Code delivery failed';
+          if (detail.includes('credentials missing') || detail.includes('API ID')) {
+            this.showCredentialsSection = true;
+          }
+          this.showToast(`Authentication rejected: ${detail}`, 'error');
         }
       } catch (e) {
         this.showToast(`Network request failed: ${e.message}`, 'error');

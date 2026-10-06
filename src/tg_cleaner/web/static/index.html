@@ -955,28 +955,146 @@
   >
     <div 
       @click.outside="showAuthModal = false"
-      class="w-full max-w-sm bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 font-mono text-xs"
+      class="w-full max-w-md bg-surface border border-borderSubtle rounded-lg shadow-2xl p-5 space-y-4 font-mono text-xs"
     >
       <div class="flex items-center justify-between pb-2 border-b border-borderSubtle">
         <h3 class="text-sm font-bold text-white">MTProto Authentication</h3>
         <button @click="showAuthModal = false" class="text-slate-400 hover:text-white">&times;</button>
       </div>
 
-      <!-- Step 1: Phone -->
-      <div x-show="authStep === 'phone'" class="space-y-3">
-        <p class="text-slate-400 text-[11px]">Enter international telephone number linked to your Telegram account.</p>
-        <input 
-          type="tel" 
-          x-model="authPhone" 
-          placeholder="+1234567890" 
-          class="w-full bg-canvas border border-borderSubtle rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-        >
+      <!-- Step 1: Credentials, Phone & Proxy -->
+      <div x-show="authStep === 'phone'" class="space-y-3.5">
+        <!-- API Credentials Block -->
+        <div class="space-y-2 p-3 rounded bg-canvas/60 border border-borderSubtle">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-slate-300">Telegram API Credentials</span>
+            <a 
+              href="https://my.telegram.org" 
+              target="_blank" 
+              class="text-[10px] text-sky-400 hover:text-sky-300 underline"
+            >my.telegram.org</a>
+          </div>
+          <p class="text-[10px] text-slate-400 leading-relaxed">
+            Obtain free API ID and API Hash from my.telegram.org under API development tools.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">API ID</label>
+              <input 
+                type="number" 
+                x-model="authApiId" 
+                placeholder="e.g. 12345678" 
+                class="w-full bg-surface border border-borderSubtle rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">API Hash</label>
+              <input 
+                type="text" 
+                x-model="authApiHash" 
+                placeholder="32-char hex string" 
+                class="w-full bg-surface border border-borderSubtle rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone Number -->
+        <div class="space-y-1">
+          <label class="block text-[10px] text-slate-400">Telegram Phone Number</label>
+          <input 
+            type="tel" 
+            x-model="authPhone" 
+            placeholder="+989123456789" 
+            class="w-full bg-canvas border border-borderSubtle rounded px-3 py-2 text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-sky-500"
+          >
+          <span class="text-[10px] text-slate-500">Include country code (e.g. +98 for Iran, +1 for US).</span>
+        </div>
+
+        <!-- Proxy Toggle Section -->
+        <div class="pt-1">
+          <button 
+            type="button" 
+            @click="showProxySection = !showProxySection"
+            class="text-[11px] text-slate-400 hover:text-slate-200 flex items-center space-x-1 cursor-pointer"
+          >
+            <span x-text="showProxySection ? '[-] Hide Network Proxy Settings' : '[+] Configure Network Proxy (SOCKS5 / HTTP / MTProxy)'"></span>
+          </button>
+          
+          <div x-show="showProxySection" class="mt-2 p-3 rounded bg-canvas/40 border border-borderSubtle space-y-2 text-[11px]">
+            <p class="text-[10px] text-slate-400">
+              Recommended for networks where direct MTProto connection is blocked.
+            </p>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">Type</label>
+                <select 
+                  x-model="authProxyType"
+                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
+                >
+                  <option value="">None</option>
+                  <option value="socks5">SOCKS5</option>
+                  <option value="http">HTTP</option>
+                  <option value="mtproxy">MTProxy</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">Host</label>
+                <input 
+                  type="text" 
+                  x-model="authProxyHost" 
+                  placeholder="127.0.0.1"
+                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
+                >
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">Port</label>
+                <input 
+                  type="number" 
+                  x-model="authProxyPort" 
+                  placeholder="10808"
+                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1.5 text-white text-xs"
+                >
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2" x-show="authProxyType === 'socks5' || authProxyType === 'http'">
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">Username (Optional)</label>
+                <input 
+                  type="text" 
+                  x-model="authProxyUser" 
+                  placeholder="user"
+                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
+                >
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">Password (Optional)</label>
+                <input 
+                  type="password" 
+                  x-model="authProxyPass" 
+                  placeholder="pass"
+                  class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
+                >
+              </div>
+            </div>
+            <div x-show="authProxyType === 'mtproxy'">
+              <label class="block text-[10px] text-slate-400 mb-1">MTProxy Secret</label>
+              <input 
+                type="text" 
+                x-model="authProxySecret" 
+                placeholder="secret hex string"
+                class="w-full bg-surface border border-borderSubtle rounded px-2 py-1 text-white text-xs"
+              >
+            </div>
+          </div>
+        </div>
+
         <button 
           @click="sendAuthCode()" 
           :disabled="authLoading || !authPhone"
-          class="w-full py-2 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40"
+          class="w-full py-2.5 rounded bg-sky-600 hover:bg-sky-500 text-white font-semibold disabled:opacity-40 transition-colors cursor-pointer"
         >
-          <span x-text="authLoading ? 'Dispatched...' : 'Request Verification Code'"></span>
+          <span x-text="authLoading ? 'Connecting to MTProto...' : 'Request Verification Code'"></span>
         </button>
       </div>
 
